@@ -96,7 +96,7 @@ impl ConnectionTrait for ConnectionOrTransaction<'_> {
 }
 
 #[derive(Debug)]
-enum DbStrategy {
+pub enum DbStrategy {
     External,
     Managed(Arc<(PostgreSQL, TempDir)>),
 }
@@ -192,7 +192,7 @@ impl Database {
         .await
     }
 
-    async fn bootstrap(
+    pub async fn bootstrap(
         username: &str,
         password: &str,
         host: &str,

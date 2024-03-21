@@ -1,0 +1,21 @@
+[package]
+name = "trustify-graphql"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+trustify-auth = { path = "../common/auth", features = ["actix"] }
+trustify-common = { path = "../common" }
+trustify-module-graph = { path = "../modules/graph" }
+trustify-infrastructure = { path = "../common/infrastructure" }
+trustify-module-importer = { path = "../modules/importer" }
+trustify-entity = { path = "../entity" }
+
+anyhow = { workspace = true }
+actix-web = "4.4"
+actix-web-lab = "0.20"
+actix-cors = "0.7"
+clap = { workspace = true, features = ["derive"] }
+juniper = "0.15.10"
+env_logger = "0.11"
+log = "0.4"

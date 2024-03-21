@@ -40,6 +40,14 @@ impl Graph {
             .map(|sbom| (self, sbom).into()))
     }
 
+    pub async fn get_sboms<TX: AsRef<Transactional>>(
+        &self,
+        tx: TX,
+    ) -> Result<Vec<SbomContext>, Error> {
+        self.locate_many_sboms(entity::sbom::Entity::find(), tx)
+            .await
+    }
+
     pub async fn ingest_sbom<TX: AsRef<Transactional>>(
         &self,
         location: &str,
@@ -287,8 +295,8 @@ impl Graph {
 
 #[derive(Clone)]
 pub struct SbomContext {
-    pub(crate) graph: Graph,
-    pub(crate) sbom: entity::sbom::Model,
+    pub graph: Graph,
+    pub sbom: entity::sbom::Model,
 }
 
 impl PartialEq for SbomContext {
