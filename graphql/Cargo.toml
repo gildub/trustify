@@ -16,6 +16,6 @@ actix-web = "4.4"
 actix-web-lab = "0.20"
 actix-cors = "0.7"
 clap = { workspace = true, features = ["derive"] }
-juniper = "0.15.10"
+juniper = "0.16.0"
 env_logger = "0.11"
 log = "0.4"

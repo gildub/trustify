@@ -1,4 +1,4 @@
-use juniper::GraphQLInputObject;
+use juniper::{graphql_object, GraphQLInputObject};
 
 use crate::schemas::root::Context;
 
@@ -17,7 +17,7 @@ pub struct SbomInput {
     pub sha256: String,
 }
 
-#[juniper::graphql_object(Context = Context)]
+#[graphql_object(Context = Context)]
 impl Sbom {
     fn id(&self) -> i32 {
         self.id
