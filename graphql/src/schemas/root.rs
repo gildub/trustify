@@ -1,7 +1,6 @@
 use juniper::{
     graphql_object, graphql_value, EmptySubscription, FieldError, FieldResult, RootNode,
 };
-impl juniper::Context for Context {}
 
 use super::sbom::{Sbom, SbomInput};
 use trustify_common::db::Transactional;
@@ -10,6 +9,7 @@ use trustify_module_graph::graph::Graph;
 pub struct Context {
     pub graph: Graph,
 }
+impl juniper::Context for Context {}
 
 pub struct QueryRoot;
 
@@ -17,9 +17,11 @@ pub struct QueryRoot;
 impl QueryRoot {
     #[graphql(description = "Get single SBOM by location and sha256")]
     async fn sbom(context: &Context, _location: String, _sha256: String) -> FieldResult<Sbom> {
-        let graph = context.graph.clone();
-
-        let loaded_sbom = match graph.get_sbom(_location.as_str(), _sha256.as_str()).await {
+        let loaded_sbom = match context
+            .graph
+            .get_sbom(_location.as_str(), _sha256.as_str())
+            .await
+        {
             Ok(loaded_sbom) => loaded_sbom,
             _ => None,
         };
@@ -40,9 +42,7 @@ impl QueryRoot {
 
     #[graphql(description = "List of all sboms")]
     async fn sboms(context: &Context) -> FieldResult<Vec<Sbom>> {
-        let graph = context.graph.clone();
-
-        let loaded_sbom = match graph.get_sboms(Transactional::None).await {
+        let loaded_sbom = match context.graph.get_sboms(Transactional::None).await {
             Ok(loaded_sbom) => loaded_sbom,
             _ => vec![],
         };
@@ -65,9 +65,8 @@ pub struct MutationRoot;
 #[graphql_object(Context = Context)]
 impl MutationRoot {
     async fn create_sbom(context: &Context, sbom: SbomInput) -> FieldResult<Sbom> {
-        let conn = context.graph.clone();
-
-        let insert = conn
+        let insert = context
+            .graph
             .ingest_sbom(&sbom.location, &sbom.sha256, Transactional::None)
             .await;
 
