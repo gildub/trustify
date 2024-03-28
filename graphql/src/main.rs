@@ -34,14 +34,14 @@ impl DB {
                 port: 5432,
                 name: "huevos".to_string(),
             },
-            true,
+            false,
         )
         .await?;
 
         let graph = Graph::new(db);
 
         Ok(Self {
-            graph: Arc::new(graph),
+            graph: Arc::new(graph.clone()),
         })
     }
 }
