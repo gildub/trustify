@@ -22,6 +22,8 @@ use trustify_common::{
 };
 use trustify_entity as entity;
 
+use super::vulnerability::VulnerabilityContext;
+
 pub mod package_version;
 pub mod package_version_range;
 pub mod qualified_package;
@@ -256,6 +258,18 @@ impl Graph {
             .map(|package| (self, package).into()))
     }
 
+    pub async fn get_packages<TX: AsRef<Transactional>>(
+        &self,
+        tx: TX,
+    ) -> Result<Vec<PackageContext>, Error> {
+        Ok(entity::package::Entity::find()
+            .all(&self.connection(&tx))
+            .await?
+            .drain(0..)
+            .map(|package| (self, package).into())
+            .collect())
+    }
+
     pub(crate) async fn get_package_by_id<TX: AsRef<Transactional>>(
         &self,
         id: i32,
@@ -275,8 +289,8 @@ impl Graph {
 /// Live context for base package.
 #[derive(Clone)]
 pub struct PackageContext<'g> {
-    pub(crate) graph: &'g Graph,
-    pub(crate) package: entity::package::Model,
+    pub graph: &'g Graph,
+    pub package: entity::package::Model,
 }
 
 impl Debug for PackageContext<'_> {

@@ -24,7 +24,7 @@ pub mod fixed_package_version;
 pub mod not_affected_package_version;
 
 impl Graph {
-    pub(crate) async fn get_advisory_by_id<TX: AsRef<Transactional>>(
+    pub async fn get_advisory_by_id<TX: AsRef<Transactional>>(
         &self,
         id: i32,
         tx: TX,
@@ -74,11 +74,23 @@ impl Graph {
 
         Ok((self, model.insert(&self.db).await?).into())
     }
+
+    pub async fn get_advisories<TX: AsRef<Transactional>>(
+        &self,
+        tx: TX,
+    ) -> Result<Vec<AdvisoryContext>, Error> {
+        Ok(entity::advisory::Entity::find()
+            .all(&self.connection(&tx))
+            .await?
+            .drain(0..)
+            .map(|advisory| (self, advisory).into())
+            .collect())
+    }
 }
 
 #[derive(Clone)]
 pub struct AdvisoryContext<'g> {
-    graph: &'g Graph,
+    pub graph: &'g Graph,
     pub advisory: entity::advisory::Model,
 }
 

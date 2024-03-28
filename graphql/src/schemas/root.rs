@@ -2,7 +2,10 @@ use juniper::{
     graphql_object, graphql_value, EmptySubscription, FieldError, FieldResult, RootNode,
 };
 
+use super::advisory::Advisory;
+use super::package::Package;
 use super::sbom::{Sbom, SbomInput};
+use super::vulnerability::Vulnerability;
 use trustify_common::db::Transactional;
 use trustify_module_graph::graph::Graph;
 
@@ -54,6 +57,67 @@ impl QueryRoot {
                     id: sbom.sbom.id,
                     location: sbom.sbom.location.to_string(),
                     sha256: sbom.sbom.sha256.to_string(),
+                })
+            })
+            .collect()
+    }
+
+    #[graphql(description = "List of all vulnerabilities")]
+    async fn vulnerabilities(context: &Context) -> FieldResult<Vec<Vulnerability>> {
+        let loaded_v11y = match context.graph.get_vulnerabilities(Transactional::None).await {
+            Ok(loaded_v11y) => loaded_v11y,
+            _ => vec![],
+        };
+
+        loaded_v11y
+            .into_iter()
+            .map(|v11y| {
+                Ok(Vulnerability {
+                    id: v11y.vulnerability.id,
+                    identifier: v11y.vulnerability.identifier.to_string(),
+                    title: v11y.vulnerability.title.unwrap_or_default(),
+                    advisories: vec![],
+                })
+            })
+            .collect()
+    }
+
+    #[graphql(description = "List of all advisories")]
+    async fn advisories(context: &Context) -> FieldResult<Vec<Advisory>> {
+        let loaded_v11y = match context.graph.get_advisories(Transactional::None).await {
+            Ok(loaded_v11y) => loaded_v11y,
+            _ => vec![],
+        };
+
+        loaded_v11y
+            .into_iter()
+            .map(|advisory| {
+                Ok(Advisory {
+                    id: advisory.advisory.id,
+                    identifier: advisory.advisory.identifier.to_string(),
+                    location: advisory.advisory.location.to_string(),
+                    sha256: advisory.advisory.sha256.to_string(),
+                    title: advisory.advisory.title.unwrap_or_default(),
+                })
+            })
+            .collect()
+    }
+
+    #[graphql(description = "List of all packages")]
+    async fn packages(context: &Context) -> FieldResult<Vec<Package>> {
+        let loaded_package = match context.graph.get_packages(Transactional::None).await {
+            Ok(loaded_package) => loaded_package,
+            _ => vec![],
+        };
+
+        loaded_package
+            .into_iter()
+            .map(|package| {
+                Ok(Package {
+                    id: package.package.id,
+                    r#type: package.package.r#type.to_string(),
+                    namespace: package.package.namespace.unwrap_or("".to_string()),
+                    name: package.package.name.to_string(),
                 })
             })
             .collect()
