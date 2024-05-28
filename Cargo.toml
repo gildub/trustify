@@ -13,6 +13,7 @@ members = [
   "modules/fundamental",
   "modules/ingestor",
   "modules/storage",
+  "graphql",
   "server",
   "trustd",
 ]
@@ -71,7 +72,7 @@ parking_lot = "0.12"
 pem = "3"
 postgresql_embedded = "0.9.1"
 prometheus = "0.13.3"
-rand = "0.8.5" # for testing
+rand = "0.8.5"                                                        # for testing
 regex = "1.10.3"
 reqwest = "0.12"
 ring = "0.17.8"
