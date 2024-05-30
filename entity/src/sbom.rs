@@ -1,4 +1,4 @@
-use async_graphql::*;
+use async_graphql::SimpleObject;
 use sea_orm::entity::prelude::*;
 use time::OffsetDateTime;
 

@@ -14,6 +14,7 @@ mod schema;
 
 struct DB {
     graph: Arc<Graph>,
+    db: Arc<db::Database>,
 }
 
 impl DB {
@@ -23,6 +24,7 @@ impl DB {
 
         Ok(Self {
             graph: Arc::new(graph.clone()),
+            db: Arc::new(db.clone()),
         })
     }
 }
@@ -62,7 +64,11 @@ async fn main() -> std::io::Result<()> {
 
     let schema = Schema::build(Query, EmptyMutation, EmptySubscription)
         .data::<Arc<Graph>>(dbms.graph)
+        .data::<Arc<db::Database>>(dbms.db)
         .finish();
+
+    // Print the schema in SDL format
+    println!("{}", &schema.sdl());
 
     HttpServer::new(move || {
         let schema = schema.clone();

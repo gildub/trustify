@@ -2,16 +2,23 @@ use crate::{
     advisory_vulnerability, affected_package_version_range, cvss3, fixed_package_version,
     not_affected_package_version, organization, vulnerability,
 };
+use async_graphql::*;
 use sea_orm::entity::prelude::*;
+// use std::sync::Arc;
 use time::OffsetDateTime;
+// use trustify_common::db;
 
-#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, SimpleObject)]
+// #[graphql(complex)]
+#[graphql(concrete(name = "Advisory", params()))]
 #[sea_orm(table_name = "advisory")]
+
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub identifier: String,
-    pub issuer_id: Option<i32>,
+    // #[graphql(skip)]
+    pub organization_id: Option<i32>,
     pub location: String,
     pub sha256: String,
     pub published: Option<OffsetDateTime>,
@@ -19,14 +26,26 @@ pub struct Model {
     pub withdrawn: Option<OffsetDateTime>,
     pub title: Option<String>,
 }
+// Since Organization already relate to Advisory this will create a cyclic dependency
+// #[ComplexObject]
+// impl Model {
+//     async fn organization(&self, ctx: &Context<'_>) -> Result<organization::Model> {
+//         let db: &Arc<db::Database> = ctx.data::<Arc<db::Database>>().unwrap();
+//         Ok(self
+//             .find_related(organization::Entity)
+//             .one(&db.connection(&db::Transactional::None))
+//             .await?
+//             .unwrap())
+//     }
+// }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::organization::Entity"
-        from = "Column::IssuerId"
+        from = "Column::OrganizationId"
         to = "super::organization::Column::Id")]
-    Issuer,
+    Organization,
 
     #[sea_orm(has_many = "super::cvss3::Entity")]
     Cvss3,
@@ -43,7 +62,7 @@ pub enum Relation {
 
 impl Related<organization::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::Issuer.def()
+        Relation::Organization.def()
     }
 }
 

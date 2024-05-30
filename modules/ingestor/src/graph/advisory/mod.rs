@@ -76,6 +76,19 @@ impl Graph {
             .map(|advisory| AdvisoryContext::new(self, advisory)))
     }
 
+    pub async fn get_advisories<TX: AsRef<Transactional>>(
+        &self,
+        tx: TX,
+    ) -> Result<Vec<AdvisoryContext>, Error> {
+        Ok(entity::advisory::Entity::find()
+            .filter(Condition::all())
+            .all(&self.connection(&tx))
+            .await?
+            .into_iter()
+            .map(|advisory| AdvisoryContext::new(self, advisory))
+            .collect())
+    }
+
     pub async fn ingest_advisory<TX: AsRef<Transactional>>(
         &self,
         identifier: impl Into<String>,
@@ -102,7 +115,7 @@ impl Graph {
         let model = entity::advisory::ActiveModel {
             id: Default::default(),
             identifier: Set(identifier),
-            issuer_id: Set(organization.map(|org| org.organization.id)),
+            organization_id: Set(organization.map(|org| org.organization.id)),
             location: Set(location),
             sha256: Set(sha256),
             title: Set(information.title),
