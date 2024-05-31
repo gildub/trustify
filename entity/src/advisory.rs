@@ -4,12 +4,12 @@ use crate::{
 };
 use async_graphql::*;
 use sea_orm::entity::prelude::*;
-// use std::sync::Arc;
+use std::sync::Arc;
 use time::OffsetDateTime;
-// use trustify_common::db;
+use trustify_common::db;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, SimpleObject)]
-// #[graphql(complex)]
+#[graphql(complex)]
 #[graphql(concrete(name = "Advisory", params()))]
 #[sea_orm(table_name = "advisory")]
 
@@ -17,7 +17,6 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i32,
     pub identifier: String,
-    // #[graphql(skip)]
     pub organization_id: Option<i32>,
     pub location: String,
     pub sha256: String,
@@ -26,18 +25,26 @@ pub struct Model {
     pub withdrawn: Option<OffsetDateTime>,
     pub title: Option<String>,
 }
-// Since Organization already relate to Advisory this will create a cyclic dependency
-// #[ComplexObject]
-// impl Model {
-//     async fn organization(&self, ctx: &Context<'_>) -> Result<organization::Model> {
-//         let db: &Arc<db::Database> = ctx.data::<Arc<db::Database>>().unwrap();
-//         Ok(self
-//             .find_related(organization::Entity)
-//             .one(&db.connection(&db::Transactional::None))
-//             .await?
-//             .unwrap())
-//     }
-// }
+
+#[ComplexObject]
+impl Model {
+    async fn organization(&self, ctx: &Context<'_>) -> Result<organization::Model> {
+        let db: &Arc<db::Database> = ctx.data::<Arc<db::Database>>().unwrap();
+        Ok(self
+            .find_related(organization::Entity)
+            .one(&db.connection(&db::Transactional::None))
+            .await?
+            .unwrap())
+    }
+
+    async fn vulnerabilities(&self, ctx: &Context<'_>) -> Result<Vec<vulnerability::Model>> {
+        let db: &Arc<db::Database> = ctx.data::<Arc<db::Database>>().unwrap();
+        Ok(self
+            .find_related(vulnerability::Entity)
+            .all(&db.connection(&db::Transactional::None))
+            .await?)
+    }
+}
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {

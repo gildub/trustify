@@ -1,14 +1,11 @@
-use std::sync::Arc;
-
+use self::schema::query::Query;
 use actix_cors::Cors;
 use actix_web::{guard, middleware::Logger, web, App, HttpResponse, HttpServer, Result};
 use async_graphql::{http::GraphiQLSource, EmptyMutation, EmptySubscription, Schema};
 use async_graphql_actix_web::GraphQL;
-
+use std::sync::Arc;
 use trustify_common::{config::Database, db};
 use trustify_module_ingestor::graph::Graph;
-
-use crate::schema::query::Query;
 
 mod schema;
 
@@ -62,13 +59,13 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("error initializing database");
 
-    let schema = Schema::build(Query, EmptyMutation, EmptySubscription)
+    let schema = Schema::build(Query::default(), EmptyMutation, EmptySubscription)
         .data::<Arc<Graph>>(dbms.graph)
         .data::<Arc<db::Database>>(dbms.db)
         .finish();
 
     // Print the schema in SDL format
-    println!("{}", &schema.sdl());
+    // println!("{}", &schema.sdl());
 
     HttpServer::new(move || {
         let schema = schema.clone();
