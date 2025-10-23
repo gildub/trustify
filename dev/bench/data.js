@@ -1,6 +1,6 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1759230683948,
-  "repoUrl": "https://github.com/guacsec/trustify",
+  "lastUpdate": 1761219353039,
+  "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
       {
@@ -14117,6 +14117,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/guacsec/trustify/commit/2ba5f5b0273209cc782dadd187fb067d41ec0363"
         },
         "date": 1759230682525,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "0d1884c125c4f0bd6d5551c2bb950367e5a078a4",
+          "message": "chore: provide better error context",
+          "timestamp": "2025-10-21T11:35:35Z",
+          "tree_id": "09c95b84faf3603a5dfe443e5b38790fb0d7abcd",
+          "url": "https://github.com/gildub/trustify/commit/0d1884c125c4f0bd6d5551c2bb950367e5a078a4"
+        },
+        "date": 1761219351286,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
