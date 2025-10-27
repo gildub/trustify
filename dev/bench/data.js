@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1761219353039,
+  "lastUpdate": 1761581761576,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14151,6 +14151,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mrizzi@redhat.com",
+            "name": "mrizzi",
+            "username": "mrizzi"
+          },
+          "committer": {
+            "email": "mrizzi@users.noreply.github.com",
+            "name": "Marco Rizzi",
+            "username": "mrizzi"
+          },
+          "distinct": true,
+          "id": "1681c18a4f3a4cd7a908bd32e46383886587d2bb",
+          "message": "doc(adr): Delete orphaned packages\n\nSigned-off-by: mrizzi <mrizzi@redhat.com>\nAssisted-by: Claude Code",
+          "timestamp": "2025-10-27T15:34:37Z",
+          "tree_id": "5be0bd2952840665ad30d9b2640e696c7c20d534",
+          "url": "https://github.com/gildub/trustify/commit/1681c18a4f3a4cd7a908bd32e46383886587d2bb"
+        },
+        "date": 1761581759901,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 7,
             "unit": "s"
           }
         ]
