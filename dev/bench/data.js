@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1761581761576,
+  "lastUpdate": 1761812164885,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14180,6 +14180,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 7,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rromerom@redhat.com",
+            "name": "Ruben Romero Montes",
+            "username": "ruromero"
+          },
+          "committer": {
+            "email": "00hf11@gmail.com",
+            "name": "Helio Frota",
+            "username": "helio-frota"
+          },
+          "distinct": true,
+          "id": "1ae7fd230bb707e0faf7e6318be87497f6824745",
+          "message": "fix: update TRUSTD_DEVMODE_ADDITIONAL_CLIENTS env var\n\nSigned-off-by: Ruben Romero Montes <rromerom@redhat.com>",
+          "timestamp": "2025-10-28T14:15:46Z",
+          "tree_id": "6c436acc1024f3a6f59241b1103e104e17a8d3ba",
+          "url": "https://github.com/gildub/trustify/commit/1ae7fd230bb707e0faf7e6318be87497f6824745"
+        },
+        "date": 1761812163448,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 8,
             "unit": "s"
           }
         ]
