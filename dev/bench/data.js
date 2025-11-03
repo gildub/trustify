@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1761812164885,
+  "lastUpdate": 1762165457793,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14209,6 +14209,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mrizzi@redhat.com",
+            "name": "mrizzi",
+            "username": "mrizzi"
+          },
+          "committer": {
+            "email": "jim@crossleys.org",
+            "name": "Jim Crossley",
+            "username": "jcrossley3"
+          },
+          "distinct": true,
+          "id": "390833b85e0d4f390834d986b3f2c21d5814f1b3",
+          "message": "test: set LC_COLLATE and TEMPLATE (TC-3070)\n\nSigned-off-by: mrizzi <mrizzi@redhat.com>",
+          "timestamp": "2025-10-30T18:36:58Z",
+          "tree_id": "eaf52b84629fa260fe202092052ab78d9811665d",
+          "url": "https://github.com/gildub/trustify/commit/390833b85e0d4f390834d986b3f2c21d5814f1b3"
+        },
+        "date": 1762165455989,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 7,
             "unit": "s"
           }
         ]
