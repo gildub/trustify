@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1762942135049,
+  "lastUpdate": 1763375934166,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14325,6 +14325,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mrizzi@redhat.com",
+            "name": "mrizzi",
+            "username": "mrizzi"
+          },
+          "committer": {
+            "email": "mrizzi@users.noreply.github.com",
+            "name": "Marco Rizzi",
+            "username": "mrizzi"
+          },
+          "distinct": true,
+          "id": "8af5206ce9c63a24e66fcb455ea9c1327b4c01ce",
+          "message": "fix: SBOM details filters out the deprecated advisories (TC-3191)\n\nSigned-off-by: mrizzi <mrizzi@redhat.com>\nAssisted-by: Claude Code",
+          "timestamp": "2025-11-17T09:01:44Z",
+          "tree_id": "82486ebe6681ccbd5c1dd9ed5f84556251c72bc6",
+          "url": "https://github.com/gildub/trustify/commit/8af5206ce9c63a24e66fcb455ea9c1327b4c01ce"
+        },
+        "date": 1763375933179,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
             "unit": "s"
           }
         ]
