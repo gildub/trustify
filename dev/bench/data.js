@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1763406619457,
+  "lastUpdate": 1763994900322,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14378,6 +14378,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/d0ad52879e0e84d509431b0e219344573f54febd"
         },
         "date": 1763406618152,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mrizzi@redhat.com",
+            "name": "mrizzi",
+            "username": "mrizzi"
+          },
+          "committer": {
+            "email": "mrizzi@users.noreply.github.com",
+            "name": "Marco Rizzi",
+            "username": "mrizzi"
+          },
+          "distinct": true,
+          "id": "9aaf962b917d0f8d267e2e1e58a89c57f57b90d6",
+          "message": "chore: add source_document.id indexes to FKs (TC-3214)\n\nSigned-off-by: mrizzi <mrizzi@redhat.com>\nAssisted-by: Claude Code",
+          "timestamp": "2025-11-21T16:18:21Z",
+          "tree_id": "4569a390b89906f6a18b21c9e94839563269c105",
+          "url": "https://github.com/gildub/trustify/commit/9aaf962b917d0f8d267e2e1e58a89c57f57b90d6"
+        },
+        "date": 1763994898978,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
