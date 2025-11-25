@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1763994900322,
+  "lastUpdate": 1764080249249,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14412,6 +14412,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "noah@santschi-cooney.ch",
+            "name": "Noah Santschi-Cooney",
+            "username": "Strum355"
+          },
+          "committer": {
+            "email": "noah@santschi-cooney.ch",
+            "name": "Noah S-C",
+            "username": "Strum355"
+          },
+          "distinct": true,
+          "id": "f40941af83425789d15bf6efcdf04bf915b00094",
+          "message": "chore: add tests & unbound version range",
+          "timestamp": "2025-11-25T11:13:27Z",
+          "tree_id": "390e79275636cb37e1bc9f5f315c86bc430faa55",
+          "url": "https://github.com/gildub/trustify/commit/f40941af83425789d15bf6efcdf04bf915b00094"
+        },
+        "date": 1764080248110,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 7,
             "unit": "s"
           }
         ]
