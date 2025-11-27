@@ -11,6 +11,10 @@ pub struct Model {
     pub package: Option<String>,
     pub product_version_range_id: Uuid,
     pub context_cpe_id: Option<Uuid>,
+    /// Generated column: namespace part of package (NULL if no '/' in package)
+    pub package_namespace: Option<String>,
+    /// Generated column: name part of package (everything after '/' or entire package if no '/')
+    pub package_name: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
