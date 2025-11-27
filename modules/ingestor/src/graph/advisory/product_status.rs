@@ -66,6 +66,16 @@ impl ProductStatus {
         advisory_id: Uuid,
         vulnerability_id: String,
     ) -> product_status::ActiveModel {
+        let (package_namespace, package_name) =
+            self.package
+                .as_ref()
+                .map_or((None, None), |pkg| match pkg.split_once('/') {
+                    Some((namespace, name)) => {
+                        (Some(namespace.to_string()), Some(name.to_string()))
+                    }
+                    None => (None, Some(pkg.to_string())),
+                });
+
         product_status::ActiveModel {
             id: Set(self.uuid(advisory_id, vulnerability_id.clone())),
             advisory_id: Set(advisory_id),
@@ -74,6 +84,8 @@ impl ProductStatus {
             package: Set(self.package),
             context_cpe_id: Set(self.cpe.as_ref().map(Cpe::uuid)),
             product_version_range_id: Set(self.product_version_range_id),
+            package_namespace: Set(package_namespace),
+            package_name: Set(package_name),
         }
     }
 
