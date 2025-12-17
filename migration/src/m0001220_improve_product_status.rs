@@ -48,11 +48,10 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // CONCURRENTLY (not supported by SeaORM) to avoid blocking writes
         manager
             .get_connection()
             .execute_unprepared(
-                "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_product_status_package_lookup \
+                "CREATE INDEX IF NOT EXISTS idx_product_status_package_lookup \
                  ON product_status (package_namespace, package_name)",
             )
             .await?;
