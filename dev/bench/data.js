@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1764340005593,
+  "lastUpdate": 1765977608732,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14494,6 +14494,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/e22474552f61d25419b15e3abc4772d8e0180a24"
         },
         "date": 1764340004083,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "JimFuller-RedHat",
+            "username": "JimFuller-RedHat"
+          },
+          "committer": {
+            "email": "81251736+JimFuller-RedHat@users.noreply.github.com",
+            "name": "Jim Fuller",
+            "username": "JimFuller-RedHat"
+          },
+          "distinct": true,
+          "id": "648d488693ece4c6bb8560d94bad52ae742517b3",
+          "message": "latest: fix TC-3278 add more test data",
+          "timestamp": "2025-12-16T10:52:30Z",
+          "tree_id": "908419149eaa2f52f48c2cdd4bc2a7a6bad45edd",
+          "url": "https://github.com/gildub/trustify/commit/648d488693ece4c6bb8560d94bad52ae742517b3"
+        },
+        "date": 1765977606763,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
