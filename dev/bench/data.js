@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1765977608732,
+  "lastUpdate": 1769542794383,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14523,6 +14523,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/648d488693ece4c6bb8560d94bad52ae742517b3"
         },
         "date": 1765977606763,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "00hf11@gmail.com",
+            "name": "Helio Frota",
+            "username": "helio-frota"
+          },
+          "committer": {
+            "email": "00hf11@gmail.com",
+            "name": "Helio Frota",
+            "username": "helio-frota"
+          },
+          "distinct": true,
+          "id": "56ee049a4c6500cd5d320606113e0aec614107a3",
+          "message": "perf: Improves a bit the recommend endpoint\n\nAssisted-by: Claude Code",
+          "timestamp": "2026-01-22T17:00:11Z",
+          "tree_id": "c4e46f916c9a8679d04799f4073ccf50bb984af5",
+          "url": "https://github.com/gildub/trustify/commit/56ee049a4c6500cd5d320606113e0aec614107a3"
+        },
+        "date": 1769542793019,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
