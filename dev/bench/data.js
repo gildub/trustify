@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1769542794383,
+  "lastUpdate": 1769700765178,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14557,6 +14557,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "00hf11@gmail.com",
+            "name": "Helio Frota",
+            "username": "helio-frota"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "a93901a3b5ba0b6bd38e2f8cead9b5cee13333b1",
+          "message": "chore: removing rust-toolchain.toml\n\n* Also setting minimum supported Rust version aligned with current\nrust version available on github action runner.",
+          "timestamp": "2026-01-28T07:06:56Z",
+          "tree_id": "26aacada24aae833e18732ba9a0c27e7cf1646d9",
+          "url": "https://github.com/gildub/trustify/commit/a93901a3b5ba0b6bd38e2f8cead9b5cee13333b1"
+        },
+        "date": 1769700764164,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
             "unit": "s"
           }
         ]
