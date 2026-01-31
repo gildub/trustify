@@ -1,470 +1,436 @@
 # Trustify Data Model
 
+This is the physical database schema showing tables and their relationships.
+
 ```mermaid
-classDiagram
-    %% Core Advisory Entities
-    class advisory {
-        +UUID id
-        +UUID issuer_id
-        +timestamp published
-        +timestamp modified
-        +timestamp withdrawn
-        +String identifier
-        +String title
-        +String version
-        +String document_id
-        +jsonb labels
-        +UUID source_document_id
-        +bool deprecated
+---
+title: Trustify Data model
+---
+erDiagram
+    %% Core Documents
+    source_document {
+        uuid id PK
+        varchar sha256
+        varchar sha384
+        varchar sha512
+        bigint size
+        timestamp ingested
     }
 
-    class advisory_vulnerability {
-        +UUID advisory_id
-        +String vulnerability_id
-        +String title
-        +String summary
-        +String description
-        +timestamp discovery_date
-        +timestamp release_date
-        +timestamp reserved_date
-        +text[] cwes
+    %% Advisory Domain
+    advisory {
+        uuid id PK
+        uuid source_document_id FK
+        uuid issuer_id FK
+        varchar identifier
+        varchar document_id
+        varchar title
+        varchar version
+        timestamp published
+        timestamp modified
+        timestamp withdrawn
+        jsonb labels
+        bool deprecated
     }
 
-    %% Vulnerability & Weakness
-    class vulnerability {
-        +String id
-        +String title
-        +timestamp published
-        +timestamp modified
-        +timestamp withdrawn
-        +timestamp reserved
-        +text[] cwes
+    vulnerability {
+        varchar id PK
+        varchar title
+        text[] cwes
+        timestamp published
+        timestamp modified
+        timestamp withdrawn
+        timestamp reserved
+        timestamp timestamp
     }
 
-    class vulnerability_description {
-        +UUID id
-        +String vulnerability_id
-        +UUID advisory_id
-        +String lang
-        +String description
-        +timestamp timestamp
+    advisory_vulnerability {
+        uuid advisory_id PK,FK
+        varchar vulnerability_id PK,FK
+        varchar title
+        varchar summary
+        varchar description
+        text[] cwes
+        timestamp discovery_date
+        timestamp release_date
+        timestamp reserved_date
     }
 
-    class weakness {
-        +text id
-        +text description
-        +text extended_description
-        +text[] child_of
-        +text[] parent_of
-        +text[] starts_with
-        +text[] can_follow
-        +text[] can_precede
-        +text[] required_by
-        +text[] requires
-        +text[] can_also_be
-        +text[] peer_of
+    vulnerability_description {
+        uuid id PK
+        varchar vulnerability_id FK
+        uuid advisory_id FK
+        varchar lang
+        varchar description
+        timestamp timestamp
     }
 
-    %% CVSS Scoring
-    class cvss3 {
-        +int minor_version
-        +UUID advisory_id
-        +String vulnerability_id
-        +cvss3_av av
-        +cvss3_ac ac
-        +cvss3_pr pr
-        +cvss3_ui ui
-        +cvss3_s s
-        +cvss3_c c
-        +cvss3_i i
-        +cvss3_a a
-        +double score
-        +cvss3_severity severity
+    weakness {
+        text id PK
+        text description
+        text extended_description
+        text[] child_of
+        text[] parent_of
+        text[] starts_with
+        text[] can_follow
+        text[] can_precede
+        text[] required_by
+        text[] requires
+        text[] can_also_be
+        text[] peer_of
     }
 
-    class cvss4 {
-        +int minor_version
-        +UUID advisory_id
-        +String vulnerability_id
-        +cvss4_av av
-        +cvss4_ac ac
-        +cvss4_at at
-        +cvss4_pr pr
-        +cvss4_ui ui
-        +cvss4_vc vc
-        +cvss4_vi vi
-        +cvss4_va va
-        +cvss4_sc sc
-        +cvss4_si si
-        +cvss4_sa sa
+    cvss3 {
+        uuid advisory_id PK,FK
+        varchar vulnerability_id PK,FK
+        int minor_version
+        cvss3_av av
+        cvss3_ac ac
+        cvss3_pr pr
+        cvss3_ui ui
+        cvss3_s s
+        cvss3_c c
+        cvss3_i i
+        cvss3_a a
+        double_precision score
+        cvss3_severity severity
     }
 
-    %% PURL Hierarchy (Package URLs)
-    class base_purl {
-        +UUID id
-        +timestamp timestamp
-        +String type
-        +String namespace
-        +String name
+    cvss4 {
+        uuid advisory_id PK,FK
+        varchar vulnerability_id PK,FK
+        int minor_version
+        cvss4_av av
+        cvss4_ac ac
+        cvss4_at at
+        cvss4_pr pr
+        cvss4_ui ui
+        cvss4_vc vc
+        cvss4_vi vi
+        cvss4_va va
+        cvss4_sc sc
+        cvss4_si si
+        cvss4_sa sa
     }
 
-    class versioned_purl {
-        +UUID id
-        +UUID base_purl_id
-        +String version
-        +timestamp timestamp
+    %% PURL Hierarchy
+    base_purl {
+        uuid id PK
+        varchar type
+        varchar namespace
+        varchar name
+        timestamp timestamp
     }
 
-    class qualified_purl {
-        +UUID id
-        +UUID versioned_purl_id
-        +jsonb qualifiers
-        +jsonb purl
-        +timestamp timestamp
+    versioned_purl {
+        uuid id PK
+        uuid base_purl_id FK
+        varchar version
+        timestamp timestamp
     }
 
-    %% SBOM (Software Bill of Materials)
-    class sbom {
-        +UUID sbom_id
-        +String node_id
-        +String document_id
-        +timestamp published
-        +String[] authors
-        +jsonb labels
-        +UUID source_document_id
-        +text[] data_licenses
+    qualified_purl {
+        uuid id PK
+        uuid versioned_purl_id FK
+        jsonb qualifiers
+        jsonb purl
+        timestamp timestamp
     }
 
-    class sbom_node {
-        +UUID sbom_id
-        +String node_id
-        +String name
+    %% SBOM Domain
+    sbom {
+        uuid sbom_id PK
+        uuid source_document_id FK
+        varchar node_id
+        varchar document_id
+        timestamp published
+        varchar[] authors
+        jsonb labels
+        text[] data_licenses
     }
 
-    class sbom_package {
-        +UUID sbom_id
-        +String node_id
-        +String version
+    sbom_node {
+        uuid sbom_id PK,FK
+        varchar node_id PK
+        varchar name
     }
 
-    class sbom_file {
-        +UUID sbom_id
-        +String node_id
+    sbom_package {
+        uuid sbom_id PK,FK
+        varchar node_id PK,FK
+        varchar version
     }
 
-    class sbom_node_checksum {
-        +UUID sbom_id
-        +String node_id
-        +String type
-        +String value
+    sbom_file {
+        uuid sbom_id PK,FK
+        varchar node_id PK,FK
     }
 
-    class sbom_external_node {
-        +UUID sbom_id
-        +String node_id
-        +String external_doc_ref
-        +String external_node_ref
-        +int external_type
-        +UUID target_sbom_id
-        +int discriminator_type
-        +String discriminator_value
+    sbom_node_checksum {
+        uuid sbom_id PK,FK
+        varchar node_id PK,FK
+        varchar type PK
+        varchar value
     }
 
-    class sbom_package_purl_ref {
-        +UUID sbom_id
-        +String node_id
-        +UUID qualified_purl_id
+    sbom_package_purl_ref {
+        uuid sbom_id PK,FK
+        varchar node_id PK,FK
+        uuid qualified_purl_id FK
     }
 
-    class sbom_package_cpe_ref {
-        +UUID sbom_id
-        +String node_id
-        +UUID cpe_id
+    sbom_package_cpe_ref {
+        uuid sbom_id PK,FK
+        varchar node_id PK,FK
+        uuid cpe_id FK
     }
 
-    class package_relates_to_package {
-        +UUID sbom_id
-        +String left_node_id
-        +int relationship
-        +String right_node_id
+    sbom_external_node {
+        uuid sbom_id PK,FK
+        varchar node_id PK
+        varchar external_doc_ref
+        varchar external_node_ref
+        int external_type
+        uuid target_sbom_id FK
+        int discriminator_type
+        varchar discriminator_value
     }
 
-    class relationship {
-        +int id
-        +String description
+    package_relates_to_package {
+        uuid sbom_id PK,FK
+        varchar left_node_id PK,FK
+        varchar right_node_id PK,FK
+        int relationship FK
     }
 
-    %% CPE (Common Platform Enumeration)
-    class cpe {
-        +UUID id
-        +String part
-        +String vendor
-        +String product
-        +String version
-        +String update
-        +String edition
-        +String language
-        +String sw_edition
-        +String target_sw
-        +String target_hw
-        +String other
+    relationship {
+        int id PK
+        varchar description
     }
 
-    %% Product Management
-    class organization {
-        +UUID id
-        +String name
-        +String cpe_key
-        +String website
+    %% CPE
+    cpe {
+        uuid id PK
+        varchar part
+        varchar vendor
+        varchar product
+        varchar version
+        varchar update
+        varchar edition
+        varchar language
+        varchar sw_edition
+        varchar target_sw
+        varchar target_hw
+        varchar other
     }
 
-    class product {
-        +UUID id
-        +UUID vendor_id
-        +String name
-        +String cpe_key
+    %% Product Domain
+    organization {
+        uuid id PK
+        varchar name
+        varchar cpe_key
+        varchar website
     }
 
-    class product_version {
-        +UUID id
-        +UUID product_id
-        +UUID sbom_id
-        +String version
-        +timestamp timestamp
+    product {
+        uuid id PK
+        uuid vendor_id FK
+        varchar name
+        varchar cpe_key
     }
 
-    class product_version_range {
-        +UUID id
-        +UUID product_id
-        +UUID version_range_id
-        +String cpe_key
+    product_version {
+        uuid id PK
+        uuid product_id FK
+        uuid sbom_id FK
+        varchar version
+        timestamp timestamp
     }
 
-    %% Status Management
-    class status {
-        +UUID id
-        +String slug
-        +String name
-        +String description
+    product_version_range {
+        uuid id PK
+        uuid product_id FK
+        uuid version_range_id FK
+        varchar cpe_key
     }
 
-    class purl_status {
-        +UUID id
-        +UUID advisory_id
-        +UUID status_id
-        +UUID base_purl_id
-        +UUID version_range_id
-        +String vulnerability_id
-        +UUID context_cpe_id
+    %% Status
+    status {
+        uuid id PK
+        varchar slug
+        varchar name
+        varchar description
     }
 
-    class product_status {
-        +UUID id
-        +UUID advisory_id
-        +String vulnerability_id
-        +UUID status_id
-        +UUID product_version_range_id
-        +UUID context_cpe_id
-        +String package
+    purl_status {
+        uuid id PK
+        uuid advisory_id FK
+        varchar vulnerability_id FK
+        uuid status_id FK
+        uuid base_purl_id FK
+        uuid version_range_id FK
+        uuid context_cpe_id FK
     }
 
-    %% Version Range
-    class version_range {
-        +UUID id
-        +String version_scheme_id
-        +String low_version
-        +bool low_inclusive
-        +String high_version
-        +bool high_inclusive
+    product_status {
+        uuid id PK
+        uuid advisory_id FK
+        varchar vulnerability_id FK
+        uuid status_id FK
+        uuid product_version_range_id FK
+        uuid context_cpe_id FK
+        varchar package
     }
 
-    class version_scheme {
-        +String id
-        +String name
-        +String description
+    %% Version Management
+    version_scheme {
+        varchar id PK
+        varchar name
+        varchar description
     }
 
-    %% License Management
-    class license {
-        +UUID id
-        +String text
-        +text[] spdx_licenses
-        +text[] spdx_license_exceptions
+    version_range {
+        uuid id PK
+        varchar version_scheme_id FK
+        varchar low_version
+        bool low_inclusive
+        varchar high_version
+        bool high_inclusive
     }
 
-    class purl_license_assertion {
-        +UUID id
-        +UUID license_id
-        +UUID sbom_id
-        +UUID versioned_purl_id
+    %% License
+    license {
+        uuid id PK
+        varchar text
+        text[] spdx_licenses
+        text[] spdx_license_exceptions
     }
 
-    class cpe_license_assertion {
-        +UUID id
-        +UUID license_id
-        +UUID sbom_id
-        +UUID cpe_id
+    purl_license_assertion {
+        uuid id PK
+        uuid license_id FK
+        uuid sbom_id FK
+        uuid versioned_purl_id FK
     }
 
-    %% Storage & Import
-    class source_document {
-        +UUID id
-        +String sha256
-        +String sha384
-        +String sha512
-        +bigint size
-        +timestamp ingested
+    cpe_license_assertion {
+        uuid id PK
+        uuid license_id FK
+        uuid sbom_id FK
+        uuid cpe_id FK
     }
 
-    class importer {
-        +String name
-        +UUID revision
-        +int state
-        +timestamp last_change
-        +String last_error
-        +timestamp last_success
-        +timestamp last_run
-        +jsonb continuation
-        +jsonb configuration
-        +int progress_current
-        +int progress_total
-        +String progress_message
+    %% Importer
+    importer {
+        varchar name PK
+        uuid revision
+        int state
+        timestamp last_change
+        varchar last_error
+        timestamp last_success
+        timestamp last_run
+        jsonb continuation
+        jsonb configuration
+        int progress_current
+        int progress_total
+        varchar progress_message
     }
 
-    class importer_report {
-        +UUID id
-        +String importer
-        +timestamp creation
-        +String error
-        +jsonb report
+    importer_report {
+        uuid id PK
+        varchar importer FK
+        timestamp creation
+        varchar error
+        jsonb report
     }
 
-    %% User Settings
-    class user_preferences {
-        +String user_id
-        +String key
-        +UUID revision
-        +jsonb data
+    %% User
+    user_preferences {
+        varchar user_id PK
+        varchar key PK
+        uuid revision
+        jsonb data
     }
 
-    %% Relationships - Advisory
-    advisory "1" --> "*" advisory_vulnerability : has
-    advisory "1" --> "*" cvss3 : has_scores
-    advisory "1" --> "*" cvss4 : has_scores
-    advisory "*" --> "1" source_document : stored_in
-    advisory "1" --> "*" purl_status : affects
-    advisory "1" --> "*" product_status : affects
-    advisory "1" --> "*" vulnerability_description : has
+    %% Relationships - Advisory Domain
+    advisory ||--o{ source_document : "stored_in"
+    advisory ||--o| organization : "issued_by"
+    advisory ||--o{ advisory_vulnerability : "has"
+    advisory ||--o{ cvss3 : "has_scores"
+    advisory ||--o{ cvss4 : "has_scores"
+    advisory ||--o{ vulnerability_description : "describes"
+    advisory ||--o{ purl_status : "affects_purl"
+    advisory ||--o{ product_status : "affects_product"
 
-    %% Relationships - Vulnerability
-    vulnerability "1" --> "*" advisory_vulnerability : reported_in
-    vulnerability "1" --> "*" vulnerability_description : has
-    vulnerability "1" --> "*" cvss3 : has_scores
-    vulnerability "1" --> "*" cvss4 : has_scores
-    weakness "1" --> "*" vulnerability : categorizes
+    vulnerability ||--o{ advisory_vulnerability : "reported_in"
+    vulnerability ||--o{ vulnerability_description : "has_descriptions"
+    vulnerability ||--o{ cvss3 : "scored_by"
+    vulnerability ||--o{ cvss4 : "scored_by"
+    vulnerability ||--o{ purl_status : "identified_in"
+    vulnerability ||--o{ product_status : "identified_in"
+
+    weakness ||--o{ vulnerability : "categorizes"
 
     %% Relationships - PURL Hierarchy
-    base_purl "1" --> "*" versioned_purl : has_versions
-    versioned_purl "1" --> "*" qualified_purl : has_qualifiers
-    qualified_purl "1" --> "*" sbom_package_purl_ref : referenced_in
+    base_purl ||--o{ versioned_purl : "has_versions"
+    base_purl ||--o{ purl_status : "status_applies_to"
 
-    %% Relationships - SBOM Structure
-    sbom "1" --> "*" sbom_node : contains
-    sbom_node "1" <|-- sbom_package : is_a
-    sbom_node "1" <|-- sbom_file : is_a
-    sbom "1" --> "*" sbom_node_checksum : has
-    sbom "1" --> "*" sbom_external_node : references
-    sbom "1" --> "*" package_relates_to_package : defines_relationships
-    sbom "*" --> "1" source_document : stored_in
+    versioned_purl ||--o{ qualified_purl : "has_qualifiers"
+    versioned_purl ||--o{ purl_license_assertion : "licensed_as"
 
-    sbom_package "1" --> "*" sbom_package_purl_ref : has
-    sbom_package "1" --> "*" sbom_package_cpe_ref : has
+    qualified_purl ||--o{ sbom_package_purl_ref : "referenced_in"
 
-    package_relates_to_package "*" --> "1" relationship : type
-    sbom_external_node "*" --> "1" sbom : external_reference
+    %% Relationships - SBOM
+    sbom ||--o{ source_document : "stored_in"
+    sbom ||--o{ sbom_node : "contains"
+    sbom ||--o{ sbom_package : "has_packages"
+    sbom ||--o{ sbom_file : "has_files"
+    sbom ||--o{ sbom_node_checksum : "has_checksums"
+    sbom ||--o{ sbom_external_node : "references_external"
+    sbom ||--o{ sbom_external_node : "referenced_by"
+    sbom ||--o{ package_relates_to_package : "defines_relationships"
+    sbom ||--o{ purl_license_assertion : "asserts_purl_license"
+    sbom ||--o{ cpe_license_assertion : "asserts_cpe_license"
+    sbom ||--o{ product_version : "documents"
+
+    sbom_node ||--o| sbom_package : "is_package"
+    sbom_node ||--o| sbom_file : "is_file"
+
+    sbom_package ||--o{ sbom_package_purl_ref : "identified_by_purl"
+    sbom_package ||--o{ sbom_package_cpe_ref : "identified_by_cpe"
+
+    relationship ||--o{ package_relates_to_package : "typed_by"
+
+    %% Relationships - CPE
+    cpe ||--o{ sbom_package_cpe_ref : "referenced_in"
+    cpe ||--o{ cpe_license_assertion : "licensed_as"
+    cpe ||--o{ purl_status : "context_for_purl"
+    cpe ||--o{ product_status : "context_for_product"
 
     %% Relationships - Product
-    organization "1" --> "*" product : owns
-    product "1" --> "*" product_version : has
-    product "1" --> "*" product_version_range : has
-    product_version "*" --> "0..1" sbom : documented_by
-    product_version_range "*" --> "1" version_range : uses
+    organization ||--o{ product : "owns"
+    organization ||--o{ advisory : "issues"
+
+    product ||--o{ product_version : "has_versions"
+    product ||--o{ product_version_range : "has_version_ranges"
+
+    product_version_range ||--o{ product_status : "status_applies_to"
+    product_version_range ||--o{ version_range : "uses_range"
 
     %% Relationships - Status
-    purl_status "*" --> "1" base_purl : applies_to
-    purl_status "*" --> "1" status : has
-    purl_status "*" --> "1" advisory : from
-    purl_status "*" --> "1" version_range : version_constraint
-    purl_status "*" --> "0..1" cpe : context
-
-    product_status "*" --> "1" status : has
-    product_status "*" --> "1" advisory : from
-    product_status "*" --> "1" product_version_range : applies_to
-    product_status "*" --> "0..1" cpe : context
-
-    %% Relationships - CPE & License
-    cpe "1" --> "*" sbom_package_cpe_ref : referenced_in
-    cpe "1" --> "*" cpe_license_assertion : has
-
-    license "1" --> "*" purl_license_assertion : asserted_for
-    license "1" --> "*" cpe_license_assertion : asserted_for
-
-    purl_license_assertion "*" --> "1" versioned_purl : applies_to
-    purl_license_assertion "*" --> "1" sbom : in_context
-    cpe_license_assertion "*" --> "1" sbom : in_context
+    status ||--o{ purl_status : "status_type"
+    status ||--o{ product_status : "status_type"
 
     %% Relationships - Version
-    version_range "*" --> "1" version_scheme : uses_scheme
+    version_scheme ||--o{ version_range : "schemes"
 
-    %% Relationships - Import
-    importer "1" --> "*" importer_report : generates
+    version_range ||--o{ product_version_range : "used_by_product"
+    version_range ||--o{ purl_status : "constrains_purl"
 
-    %% Notes
-    note for base_purl "PURL base: type, namespace, name only"
-    note for versioned_purl "Adds version to base PURL"
-    note for qualified_purl "Adds qualifiers (jsonb) to versioned PURL"
-    note for sbom "Root node for Software Bill of Materials"
-    note for advisory "Security advisory document"
-    note for vulnerability "CVE or other vulnerability identifier"
+    %% Relationships - License
+    license ||--o{ purl_license_assertion : "asserted_for_purl"
+    license ||--o{ cpe_license_assertion : "asserted_for_cpe"
+
+    %% Relationships - Importer
+    importer ||--o{ importer_report : "generates"
 ```
-
-## Key Design Patterns
-
-### PURL Three-Tier Hierarchy
-
-The Package URL (PURL) structure uses a normalized three-tier approach:
-
-- **BasePurl**: Identifies package type, namespace, and name
-- **VersionedPurl**: References BasePurl + adds version
-- **QualifiedPurl**: References VersionedPurl + adds qualifiers (stored as JSONB)
-
-### SBOM Node Hierarchy
-
-SBOM nodes use a discriminated union pattern:
-
-- **sbom_node**: Base table with common attributes
-- **sbom_package**: Extends node with package-specific attributes
-- **sbom_file**: Extends node for file entries
-
-### Relationship Graph
-
-Package relationships are modeled as a directed graph:
-
-- `package_relates_to_package` defines edges
-- `relationship` enum defines edge types (Contains, Dependency, etc.)
-- Supports transitive queries via PostgreSQL functions
-
-### Status Tracking
-
-Dual status tracking for both package URLs and products:
-
-- **purl_status**: Tracks vulnerability status for specific PURLs
-- **product_status**: Tracks vulnerability status for products/versions
-
-### Version Matching
-
-Flexible version comparison using:
-
-- `version_scheme`: Defines versioning semantics (semver, rpm, maven, python, etc.)
-- `version_range`: Defines inclusive/exclusive bounds
-- PostgreSQL functions for version comparison per scheme
