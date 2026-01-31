@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1769700765178,
+  "lastUpdate": 1769861507055,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14586,6 +14586,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "noah@santschi-cooney.ch",
+            "name": "Noah Santschi-Cooney",
+            "username": "Strum355"
+          },
+          "committer": {
+            "email": "noah@santschi-cooney.ch",
+            "name": "Noah S-C",
+            "username": "Strum355"
+          },
+          "distinct": true,
+          "id": "015cb9e34fa77e509eba35974df2d73bd1aea0d8",
+          "message": "feat: include all scores in PurlStatus",
+          "timestamp": "2026-01-29T15:10:53Z",
+          "tree_id": "ec885c1b15ffb56dc3ae78ae8a1ebffad135193a",
+          "url": "https://github.com/gildub/trustify/commit/015cb9e34fa77e509eba35974df2d73bd1aea0d8"
+        },
+        "date": 1769861506280,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 8,
             "unit": "s"
           }
         ]
