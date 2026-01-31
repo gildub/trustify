@@ -6,7 +6,7 @@ This is a high-level conceptual view of the core domain objects and their relati
 ---
 title: Trustify Domain model
 ---
-graph TB
+flowchart TB
     subgraph Supply["Supply Chain Intelligence"]
         SBOM[SBOM<br/>---<br/>Software Bill of Materials<br/>inventory of components]
         Package[Package<br/>---<br/>PURL: type, namespace, name, version<br/>qualifiers, CPE]
@@ -78,11 +78,11 @@ graph TB
     Query -->|searches| Package
     Query -->|traverses| AnalysisGraph
 
-    classDef supply fill:#fff,stroke:#4caf50,stroke-width:3px
-    classDef security fill:#fff,stroke:#f44336,stroke-width:3px
-    classDef product fill:#fff,stroke:#2196f3,stroke-width:3px
-    classDef pipeline fill:#fff,stroke:#ff9800,stroke-width:3px
-    classDef analysis fill:#fff,stroke:#9c27b0,stroke-width:3px
+    classDef supply fill:#333,stroke:#4caf50,stroke-width:3px
+    classDef security fill:#333,stroke:#f44336,stroke-width:3px
+    classDef product fill:#333,stroke:#2196f3,stroke-width:3px
+    classDef pipeline fill:#333,stroke:#ff9800,stroke-width:3px
+    classDef analysis fill:#333,stroke:#9c27b0,stroke-width:3px
 
     class SBOM,Package,File,License,Relationship supply
     class Advisory,Vulnerability,Weakness,Status security
