@@ -79,7 +79,7 @@ C4Context
     Rel(user, trustify, "Request Compliance<br/>View compliance status", "API/GUI")
     Rel(trustify, conforma, "Executes policy validation", "Spawn Process")
     Rel(conforma, policyRepo, "Fetches policies", "Git/HTTPS")
-    Rel(trustify, s3, "I3s", S3/Minio Storager, trustify, $offsetX="-30", $offsetY="+20")
+    Rel(trustify, s3, "3s", S3/Minio Storager, trustify, $offsetX="-30", $offsetY="+20")
 
     UpdateRelStyle(trustify, conforma, $offsetX="-40")
     UpdateRelStyle(user, trustify, $offsetX="-50", $offsetY="20")
@@ -102,7 +102,7 @@ C4Container
         ContainerDb(postgres, "PostgreSQL", "DBMS", "Stores SBOM metadata, relationships, <br/>and EC validation results")
         Container(ecModule, "EC Validation Module", "Rust", "Orchestrates Conforma CLI<br/>execution and result persistence")
         ContainerDb(s3, "Object Storage", "S3/Minio", "Stores SBOM documents and EC reports")
-        Container(storage, "Storage Service", "Rust", "Manages document storage<br/>(SBOMs, policies results)")
+        Container(storage, "Storage Service", "Rust", "Manages document storage<br/>(SBOMs, policy results)")
     }
 
     Container_Boundary(conforma, "Conforma System") {
@@ -157,7 +157,7 @@ C4Component
     }
 
 
-    Rel(api, ecEndpoints, "POST /sboms/{id}/ec-validate,<br/>GET /sbms/{id}/ec-report", "JSON/HTTPS")
+    Rel(api, ecEndpoints, "POST /sboms/{id}/ec-validate,<br/>GET /sboms/{id}/ec-report", "JSON/HTTPS")
     Rel(ecEndpoints, ecService, "validate_sbom()<br/> get_ec_report()", "Function call")
     Rel(ecService, policyManager, "get_policy_config()", "Function call")
     Rel(ecService, conformaExecutor, "request_validation()", "Function call")
@@ -170,6 +170,96 @@ C4Component
     UpdateRelStyle(api, ecEndpoints, $offsetX="-50", $offsetY="-50")
 
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
+```
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant UI as Trustify UI
+    participant API as Trustify API
+    participant VS as Validation Service
+    participant PM as Policy Manager
+    participant DB as PostgreSQL
+    participant S3 as Object Storage
+    participant Conf as Conforma CLI
+
+    User->>UI: Request SBOM validation for policy
+    UI->>API: POST /api/v2/sbom/{sbom_id}/validate
+    Note over UI,API: Request body: {policy_id}
+
+    API->>VS: validate_sbom_against_policy(sbom_id, policy_id)
+
+    rect rgb(42, 48, 53)
+        Note over VS,PM: Policy Resolution Phase
+        VS->>PM: get_policy_configuration(policy_id)
+        PM->>DB: SELECT * FROM ec_policies WHERE id = ?
+        DB-->>PM: Policy configuration
+        alt Policy not found
+            PM-->>VS: Error: PolicyNotFound
+            VS-->>API: 404 Not Found
+            API-->>UI: Policy not found error
+            UI-->>User: Display error: "Policy does not exist"
+        end
+        PM-->>VS: PolicyConfig {name, policy_ref, version}
+    end
+
+    rect rgb(68, 66, 62)
+        Note over VS,S3: SBOM Retrieval Phase
+        VS->>DB: SELECT * FROM sbom WHERE id = ?
+        DB-->>VS: SBOM metadata
+        alt SBOM not found
+            VS-->>API: 404 Not Found
+            API-->>UI: SBOM not found error
+            UI-->>User: Display error: "SBOM does not exist"
+        end
+
+        VS->>S3: retrieve_sbom_document(sbom_id)
+        S3-->>VS: SBOM document (JSON/XML)
+    end
+
+    rect rgb(42, 48, 53)
+        Note over VS,Conf: Validation Execution Phase
+        VS->>VS: Create temp files for SBOM and policy
+        VS->>Conf: spawn: conforma validate<br/>--policy={policy_ref}<br/>--sbom={sbom_file}<br/>--output=json
+
+        alt Validation passes
+            Conf-->>VS: Exit code: 0<br/>JSON: {result: "PASS", violations: []}
+            VS->>VS: Parse validation results
+            VS->>DB: INSERT INTO ec_validation_results<br/>(sbom_id, policy_id, status='passed',<br/>violations=[], timestamp)
+            DB-->>VS: result_id
+            VS->>S3: store_validation_report(result_id, full_json)
+            S3-->>VS: report_url
+            VS->>DB: UPDATE ec_validation_results<br/>SET report_url = ?
+            DB-->>VS: Updated
+            VS-->>API: ValidationResult {status: "passed",<br/>violations: [], report_url}
+            API-->>UI: 200 OK {passed: true, violations: 0}
+            UI-->>User: ✓ SBOM passes policy validation
+
+        else Validation fails with violations
+            Conf-->>VS: Exit code: 1<br/>JSON: {result: "FAIL",<br/>violations: [{rule, severity, message}]}
+            VS->>VS: Parse validation results
+            VS->>DB: INSERT INTO ec_validation_results<br/>(sbom_id, policy_id, status='failed',<br/>violations=json, timestamp)
+            DB-->>VS: result_id
+            VS->>S3: store_validation_report(result_id, full_json)
+            S3-->>VS: report_url
+            VS->>DB: UPDATE ec_validation_results<br/>SET report_url = ?
+            DB-->>VS: Updated
+            VS-->>API: ValidationResult {status: "failed",<br/>violations: [...], report_url}
+            API-->>UI: 200 OK {passed: false, violations: [...]}
+            UI-->>User: ✗ SBOM violates policy<br/>Show violation details
+
+        else Conforma execution error
+            Conf-->>VS: Exit code: 2<br/>stderr: "Policy file not found"
+            VS->>DB: INSERT INTO ec_validation_results<br/>(sbom_id, policy_id, status='error',<br/>error_message=stderr)
+            DB-->>VS: result_id
+            VS-->>API: Error: ValidationExecutionFailed
+            API-->>UI: 500 Internal Server Error
+            UI-->>User: Display error: "Validation failed to execute"
+        end
+    end
+
+    VS->>VS: Cleanup temp files
 ```
 
 ### Data Model
@@ -409,7 +499,7 @@ When Conforma REST API becomes available:
 
 **Cons**: Additional infrastructure, network latency, complexity for simple use case
 
-**Verdict**: Deferred - could be future enhancement for large-scale deployments
+**Verdict**: Deferred - could be future enhancements for large-scale deployments
 
 ### 3. Embedded WASM Module
 
@@ -460,7 +550,7 @@ When Conforma REST API becomes available:
 - [ ] Implement validation results display with summary statistics
 - [ ] Build violations list component with expandable details
 - [ ] Create validation history timeline view
-- [ ] Add policy selectreference management UI (admin pages)
+- [ ] Add policy reference management UI (admin pages)
   - [ ] Policy reference list view with search/filter (shows name, external URL, type)
   - [ ] Policy reference create/edit form (Git URL, OCI ref, auth config)
   - [ ] Policy reference delete confirmation
