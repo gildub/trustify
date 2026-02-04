@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1769861507055,
+  "lastUpdate": 1770215353519,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14615,6 +14615,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "JimFuller-RedHat",
+            "username": "JimFuller-RedHat"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "2826524e9f24970e56632c8d749940dbe4953e5e",
+          "message": "latest analysis: fixes TC-3278 and TC-3073 by providing tie breaker logic for when equal external node_id",
+          "timestamp": "2026-02-04T09:50:53Z",
+          "tree_id": "46330a22635325bb79de9398f3c314254de0479c",
+          "url": "https://github.com/gildub/trustify/commit/2826524e9f24970e56632c8d749940dbe4953e5e"
+        },
+        "date": 1770215352182,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
             "unit": "s"
           }
         ]
