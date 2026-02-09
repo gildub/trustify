@@ -168,6 +168,7 @@ C4Component
     Rel(ecService, s3, "Store EC report", "S3 API")
 
     UpdateRelStyle(api, ecEndpoints, $offsetX="-50", $offsetY="-50")
+    UpdateRelStyle(ecService, policyManager, $offsetX="-50", $offsetY="-50")
 
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
