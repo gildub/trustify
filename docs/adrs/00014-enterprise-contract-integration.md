@@ -221,7 +221,7 @@ sequenceDiagram
     rect rgb(42, 48, 53)
         Note over VS,Conf: Validation Execution Phase
         VS->>VS: Create temp files for SBOM and policy
-        VS->>Conf: spawn: conforma validate<br/>--policy={policy_ref}<br/>--sbom={sbom_file}<br/>--output=json
+        VS->>Conf: spawn: conforma validate<br/>input --file "$1" --policy <URL><br/>--output json --show-successes<br/>--info
 
         alt Validation passes
             Conf-->>VS: Exit code: 0<br/>JSON: {result: "PASS", violations: []}
