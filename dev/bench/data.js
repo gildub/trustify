@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770215353519,
+  "lastUpdate": 1770643839308,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14644,6 +14644,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jim@crossleys.org",
+            "name": "Jim Crossley",
+            "username": "jcrossley3"
+          },
+          "committer": {
+            "email": "jim@crossleys.org",
+            "name": "Jim Crossley",
+            "username": "jcrossley3"
+          },
+          "distinct": true,
+          "id": "783fb32461bbf872f1942a1b5b7ab2bf8010bcd2",
+          "message": "Tighten up expression construction logic and add a few more tests",
+          "timestamp": "2026-02-09T07:47:40Z",
+          "tree_id": "1d234918930e5257fb65701aa5257944fa69eedf",
+          "url": "https://github.com/gildub/trustify/commit/783fb32461bbf872f1942a1b5b7ab2bf8010bcd2"
+        },
+        "date": 1770643837083,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 8,
             "unit": "s"
           }
         ]
