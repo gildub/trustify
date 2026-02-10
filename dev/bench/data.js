@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770643839308,
+  "lastUpdate": 1770717234329,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14668,6 +14668,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/783fb32461bbf872f1942a1b5b7ab2bf8010bcd2"
         },
         "date": 1770643837083,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "58d085dd812e9f85239c3cc8a7874fe289482e24",
+          "message": "test(storage): ensure clap enforced having key and secret",
+          "timestamp": "2026-02-09T14:15:05Z",
+          "tree_id": "cbcd45cbeda94c2a002528eaecc4a675543420b4",
+          "url": "https://github.com/gildub/trustify/commit/58d085dd812e9f85239c3cc8a7874fe289482e24"
+        },
+        "date": 1770717232814,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
