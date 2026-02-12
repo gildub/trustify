@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770717234329,
+  "lastUpdate": 1770888917873,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14702,6 +14702,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "noah@santschi-cooney.ch",
+            "name": "Noah Santschi-Cooney",
+            "username": "Strum355"
+          },
+          "committer": {
+            "email": "noah@santschi-cooney.ch",
+            "name": "Noah S-C",
+            "username": "Strum355"
+          },
+          "distinct": true,
+          "id": "9a62e32a717fa19aeb090a5d35f6e2cd917fb2fe",
+          "message": "feat: ingest & expose CSAF remediation data in API",
+          "timestamp": "2026-02-11T15:49:07Z",
+          "tree_id": "3ef73e1fd898d34ceb2e200645a2beaca8c7c2a6",
+          "url": "https://github.com/gildub/trustify/commit/9a62e32a717fa19aeb090a5d35f6e2cd917fb2fe"
+        },
+        "date": 1770888916381,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 10,
             "unit": "s"
           }
         ]
