@@ -79,7 +79,7 @@ C4Context
     Rel(user, trustify, "Request Compliance<br/>View compliance status", "API/GUI")
     Rel(trustify, conforma, "Executes policy validation", "Spawn Process")
     Rel(conforma, policyRepo, "Fetches policies", "Git/HTTPS")
-    Rel(trustify, s3, "3s", S3/Minio Storager, trustify, $offsetX="-30", $offsetY="+20")
+    Rel(trustify, s3, "Stores reports", "S3 API")
 
     UpdateRelStyle(trustify, conforma, $offsetX="-40")
     UpdateRelStyle(user, trustify, $offsetX="-50", $offsetY="20")
@@ -446,43 +446,19 @@ modules/ec/
 6. **Extensibility**: Module design allows future enhancement (webhooks, notifications, etc.)
 7. **Open Source**: Conforma is open-source and actively maintained
 
-### Negative
+### Trade-offs and Risks
 
-1. **External Dependency**: Requires Conforma CLI to be installed on Trustify servers
-2. **Process Overhead**: Spawning external processes has performance implications
-3. **Error Handling Complexity**: Must handle CLI failures, timeouts, and malformed output
-4. **Version Management**: Need to track Conforma version compatibility
-5. **Resource Usage**: Multiple concurrent validations may consume significant resources
-6. **No Native API**: Until Conforma provides an API the CLI integration is less efficient than native API integration.
-
-### Risks and Mitigations
-
-| Risk                                | Mitigation                                                      |
-| ----------------------------------- | --------------------------------------------------------------- |
-| Conforma CLI unavailable/crashes    | Implement health checks, graceful error handling, retry logic   |
-| Long execution times block requests | Use async execution with configurable timeouts (default: 5 min) |
-| Large SBOMs cause memory issues     | Stream SBOM to temp file, pass file path to Conforma            |
-| CLI injection attacks               | Sanitize all inputs, use process args array (not shell strings) |
-| Version incompatibility             | Document required Conforma version, validate on startup         |
-| Storage costs for reports           | Implement retention policies, compress reports                  |
-
-### Migration Path
-
-When Conforma REST API becomes available:
-
-1. Implement API client alongside CLI executor
-2. Add configuration flag to select execution mode
-3. Gradually migrate workloads to API mode
-4. Deprecate CLI mode after stability period
-5. Remove CLI executor in future major version
-
-### Performance Considerations
-
-- **Concurrent Limits**: Implement semaphore to limit parallel Conforma executions (default: 5)
-- **Timeout**: Default 5-minute timeout, configurable per policy
-- **Caching**: Cache policy files to avoid repeated Git fetches
-- **Async**: All operations non-blocking using Tokio runtime
-- **Streaming**: Stream results incrementally for large reports
+| Trade-off / Risk                | Impact                                   | Mitigation                                                                 |
+| ------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------- |
+| External CLI dependency         | Requires Conforma installed on servers   | Health checks, graceful error handling, retry logic                        |
+| Process spawning overhead       | Performance implications per validation  | Async execution with configurable timeouts (default: 5 min)                |
+| Error handling complexity       | CLI failures, timeouts, malformed output | Distinguish validation failures from execution errors; actionable messages |
+| Version management              | Conforma version compatibility           | Document required version, validate on startup                             |
+| Resource usage under load       | Concurrent validations consume resources | Semaphore limits (default: 5), queueing, monitoring                        |
+| No native API yet               | CLI less efficient than REST integration | Adapter pattern for future API migration (see Phase 3)                     |
+| Large SBOMs cause memory issues | Out-of-memory during validation          | Stream SBOM to temp file, pass file path to Conforma                       |
+| CLI injection attacks           | Security vulnerability                   | Sanitize all inputs, use process args array (not shell strings)            |
+| Storage costs for reports       | Growing storage over time                | Retention policies, report compression                                     |
 
 ## Alternatives Considered
 
@@ -556,7 +532,6 @@ When Conforma REST API becomes available:
   - [ ] Policy reference create/edit form (Git URL, OCI ref, auth config)
   - [ ] Policy reference delete confirmation
   - [ ] Test policy connectivity button (validate URL is reachable)
-  - [ ] Policy delete confirmation
 - [ ] Add report download functionality (JSON/HTML)
 - [ ] Create detailed report preview modal
 - [ ] Implement loading indicators for validation execution
