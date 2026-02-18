@@ -110,13 +110,11 @@ C4Context
     System(trustify, "Trustify", "RHTPA")
 
     System_Ext(conforma, "Conforma", "Enterprise Contract policy validation tool")
-    System_Ext(s3, "S3", "S3/Minio Storage")
     System_Ext(policyRepo, "Policy Repository", "Git repository or storage containing EC policies")
 
     Rel(user, trustify, "Request Compliance<br/>View compliance status", "API/GUI")
     Rel(trustify, conforma, "Executes policy validation", "Spawn Process")
     Rel(conforma, policyRepo, "Fetches policies", "Git/HTTPS")
-    Rel(trustify, s3, "Stores reports", "S3 API")
 
     UpdateRelStyle(trustify, conforma, $offsetX="-40")
     UpdateRelStyle(user, trustify, $offsetX="-50", $offsetY="20")
