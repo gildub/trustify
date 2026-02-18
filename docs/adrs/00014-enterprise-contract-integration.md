@@ -180,7 +180,7 @@ C4Component
         Component(conformaExecutor, "Conforma Executor", "Async Process", "Spawns Conforma CLI and captures output")
         Component(ecService, "EC Service", "Business logic", "Orchestrates validation workflow")
         Component(resultParser, "Result Parser", "JSON parser", "Parses Conforma output into structured data")
-        Component(policyManager, "Policy Manager", "Configuration", "Manages EC policy references")
+        Component(policyManager, "Policy Manager", "Business logic", "Manages EC policy references and configuration")
         Component(resultPersistence, "Result Persistence", "Database layer", "Saves validation results")
     }
 
