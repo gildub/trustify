@@ -108,7 +108,6 @@ C4Context
     Person(user, "Trustify User", "Analyst validating SBOMs")
 
     System(trustify, "Trustify", "RHTPA")
-
     System_Ext(conforma, "Conforma", "Enterprise Contract policy validation tool")
     System_Ext(policyRepo, "Policy Repository", "Git repository or storage containing EC policies")
 
@@ -116,8 +115,9 @@ C4Context
     Rel(trustify, conforma, "Executes policy validation", "Spawn Process")
     Rel(conforma, policyRepo, "Fetches policies", "Git/HTTPS")
 
-    UpdateRelStyle(trustify, conforma, $offsetX="-40")
     UpdateRelStyle(user, trustify, $offsetX="-50", $offsetY="20")
+    UpdateRelStyle(trustify, conforma, $offsetX="-40")
+    UpdateRelStyle(conforma, policyRepo,$offsetX="-40")
 
     UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="1")
 ```
