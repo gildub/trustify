@@ -8,15 +8,9 @@ PROPOSED
 
 ## Context
 
-Organizations need to enforce security and compliance policies across their software supply chain to ensure that all software components meet specific criteria for licensing, vulnerabilities, and provenance. Currently, Trustify provides SBOM storage, analysis, and vulnerability tracking, but lacks automated policy enforcement capabilities.
+Trustify provides SBOM storage, analysis, and vulnerability tracking but lacks automated policy enforcement. Organizations need to validate SBOMs against security and compliance policies (licensing, vulnerabilities, provenance) without relying on manual, inconsistent review processes.
 
-Manual validation of SBOMs against organizational policies is:
-
-- Time-consuming and error-prone
-- Inconsistent across teams and projects
-- Difficult to scale across large numbers of SBOMs
-- Lacks audit trails and historical compliance tracking
-- Cannot provide real-time feedback on policy violations
+Enterprise Contract (Conforma) is an open-source policy enforcement tool actively maintained by Red Hat. It validates SBOMs against configurable policies and produces structured JSON output. Currently it provides only a CLI; a REST API is planned but with no committed timeline.
 
 ### Requirements
 
@@ -29,38 +23,81 @@ Users need the ability to:
 5. Generate detailed compliance reports for auditing
 6. Receive actionable feedback on policy violations
 
-### Acceptance Criteria
-
-For this integration to be considered successful, the following criteria must be met:
-
-1. **Conforma Integration**: Trustify backend integrates with Conforma CLI to execute policy checks against stored SBOMs
-2. **Policy Configuration**: Users/administrators can define or reference specific Enterprise Contract policies to enforce via the UI or API
-3. **Result Persistence**: Conforma check output (Pass/Fail status and specific violations) is parsed and saved as structured properties on the corresponding SBOM record in the database
-4. **Error Handling**: System gracefully handles execution failures (e.g., malformed SBOMs, policy timeouts, Conforma unavailable) and returns appropriate error messages
-5. **Visibility**: Users can retrieve the compliance status of an SBOM via the Trustify API or UI, including historical validation results
-
-### Available Solutions
-
-**Enterprise Contract (Conforma)** is an open-source policy enforcement tool that:
-
-- Validates SBOMs against configurable policies
-- Supports policies for licensing, vulnerabilities, and provenance
-- Provides structured output (JSON) for programmatic consumption
-- Integrates with CI/CD pipelines
-- Is open source
-- Is actively maintained by Red Hat
-
-**Current state**: Conforma provides a CLI tool but no REST API yet. Future API availability is expected but timeline is undetermined.
-
 ## Decision
 
-We will integrate Enterprise Contract (Conforma) into Trustify as an optional validation service that:
+We will integrate Conforma into Trustify as an optional validation service by spawning the Conforma CLI asynchronously.  
+Validation is manually triggered — not automatic on SBOM upload.  
+Validation on upload is deferred to a follow-up version.
 
-1. **Executes Conforma CLI** via async process spawning using `tokio::process::Command`
-2. **Stores validation results** as structured data in PostgreSQL with foreign key relationship to SBOMs
-3. **Persists detailed reports** in object storage (S3/Minio) for audit trails
-4. **Exposes REST API endpoints** for triggering validation and retrieving results
-5. **Supports policy configuration** through database-backed policy references
+What is stored where
+
+- PostgreSQL: validation status, structured violations (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, status, executed_at.
+- S3/Minio: full raw Conforma JSON report, linked from the DB row via report_url. Keeps DB rows small while preserving audit completeness.
+- Not stored: the policy definitions themselves. ec_policies stores references (URLs, OCI refs) that Conforma fetches at runtime.
+
+Storing full JSON in S3 rather than only a summary was chosen explicitly to preserve audit completeness — callers can always fetch the raw report. The DB violations JSONB holds enough structure for filtering and dashboards without duplicating the full payload.
+
+### Deferred Validation
+
+I has been decided that uploaded SBOMs start in "Pending" status and are not discoverable until validated.
+EC validation is one mechanism by which an SBOM can move from "Pending" to "Accepted" or "Rejected".
+
+Concretely:
+
+    An SBOM in "Pending" can be submitted for EC validation.
+    A passing EC result transitions the SBOM to "Accepted".
+    A failing EC result transitions it to "Rejected", with the violation details linked.
+    An EC execution error (CLI crash, policy fetch failure) does not change the SBOM's policy status — the SBOM stays Pending and the error is surfaced separately, so it doesn't silently block an SBOM.
+
+## Consequences
+
+Integrating via CLI spawning rather than a native API introduces an external process dependency that adds operational overhead (Conforma must be installed and version-pinned on every server) and per-validation process spawning overhead. These are accepted trade-offs given that no Conforma API exists yet. The executor is built behind an adapter interface so the implementation can be swapped for a REST client in Phase 3 without changes to the service layer or API.
+
+### Trade-off/Risk & Mitigation
+
+- Conforma must be installed on servers
+  - Health check on startup
+  - graceful degradation showing cached results
+- Process spawn overhead per validation
+  - Async execution; configurable timeout (default 5 min)
+- CLI injection attacks
+  - Args array only, never shell strings; all user inputs sanitized
+- Version compatibility
+  - Document required Conforma version; validate on startup
+- Concurrent load exhausting resources
+  - Semaphore (default: 5)
+  - 429 on exhaustion
+- No native API yet
+  - Adapter pattern for future migration (Phase 3)
+- Large SBOMs causing OOM
+  - Stream to temp file
+  - pass path to Conforma
+- Growing S3 storage costs
+  - Retention policy (90-day default)
+
+### Alternatives Considered
+
+#### In-Process Policy Engine: Rejected
+
+Reimplementing Enterprise Contract logic in Rust would diverge from upstream and create significant maintenance burden.
+
+#### Webhook-based Integration: Deferred
+
+Decouples validation into a separate service, which is better for large-scale deployments but adds infrastructure complexity premature for initial scope.
+
+#### Embedded WASM Module: Rejected
+
+Conforma is not available as WASM and would require major upstream changes.
+
+#### Batch Processing Queue: Deferred
+
+A Redis/RabbitMQ queue would improve retry handling and priority management; implement if the 429-based rejection approach proves insufficient under real load.
+
+### Future API Migration
+
+When Conforma provides a REST API, the executor.rs adapter is replaced with an HTTP client. A feature flag (ec-api-mode) allows gradual migration. No changes to service layer, API endpoints, or UI are required.
+
+## The solution
 
 ### System Architecture
 
@@ -138,227 +175,167 @@ C4Component
     Container(api, "API Gateway", "Actix-web", "REST API for EC operations")
 
     Container_Boundary(ecModule, "EC Validation Module") {
-        Component(ecEndpoints, "EC Endpoints", "Actix-web handlers", "REST endpoints for<br/> validation operations")
-        Component(conformaExecutor, "Conforma Executor", "Async Process", "Executes Conforma CLI<br/> and captures output")
-        Component(policyManager, "Policy Manager", "Configuration", "Manages EC policy<br/>references and configuration")
+        Component(ecEndpoints, "EC Endpoints", "Actix-web handlers", "REST endpoints for validation operations")
+        Component(conformaExecutor, "Conforma Executor", "Async Process", "Spawns Conforma CLI and captures output")
         Component(ecService, "EC Service", "Business logic", "Orchestrates validation workflow")
-        Component(resultParser, "Result Parser", "JSON parser", "Parses Conforma output<br/>into structured data")
-        Component(resultPersistence, "Result Persistence", "Database layer", "Saves validation results to database")
-        Component(SBOMModel, "SBOM Model", "Data structure", "API models for validation<br/> requests/responses")
+        Component(resultParser, "Result Parser", "JSON parser", "Parses Conforma output into structured data")
+        Component(policyManager, "Policy Manager", "Configuration", "Manages EC policy references")
+        Component(resultPersistence, "Result Persistence", "Database layer", "Saves validation results")
     }
 
-    Container_Boundary(external, "External Systems") {
-        System_Ext(conforma, "Conforma CLI", "Enterprise Contract<br/>validation tool")
+    Container_Boundary(external, "External System") {
+        System_Ext(conforma, "Conforma CLI", "Enterprise Contract validation tool")
+    }
+
+    Container_Boundary(dbms, "Database") {
+        ContainerDb(postgres, "PostgreSQL", "Database", "Stores validation results and policy references")
+    }
+        Container_Boundary(storage, "S3 System") {
         System_Ext(s3, "S3 Object Storage", "Stores SBOM documents and reports")
     }
 
-    Container_Boundary(postgres, "database") {
-        ContainerDb(postgres, "PostgreSQL", "Database", "Stores validation results")
-    }
-
-
-    Rel(api, ecEndpoints, "POST /sboms/{id}/ec-validate,<br/>GET /sboms/{id}/ec-report", "JSON/HTTPS")
-    Rel(ecEndpoints, ecService, "validate_sbom()<br/> get_ec_report()", "Function call")
+    Rel(api, ecEndpoints, "POST /sboms/{id}/ec-validate,\nGET /sboms/{id}/ec-report", "JSON/HTTPS")
+    Rel(ecEndpoints, ecService, "validate_sbom() / get_ec_report()", "Function call")
     Rel(ecService, policyManager, "get_policy_config()", "Function call")
+    Rel(policyManager, postgres, "SELECT ec_policies", "SQL")
     Rel(ecService, conformaExecutor, "request_validation()", "Function call")
     Rel(conformaExecutor, conforma, "Runs CLI command", "Process spawn")
-    Rel(resultParser, SBOMModel, "Creates models", "Data mapping")
+    Rel(ecService, resultParser, "parse_output()", "Function call")
     Rel(ecService, resultPersistence, "save_results()", "Function call")
-    Rel(resultPersistence, postgres, "INSERT validation_results", "SQL")
+    Rel(resultPersistence, postgres, "INSERT ec_validation_results", "SQL")
     Rel(ecService, s3, "Store EC report", "S3 API")
 
     UpdateRelStyle(api, ecEndpoints, $offsetX="-50", $offsetY="-50")
-    UpdateRelStyle(ecService, policyManager, $offsetX="-50", $offsetY="-50")
 
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
+
 ```
+
+### The main sequence Diagram
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User
-    participant UI as Trustify UI
     participant API as Trustify API
-    participant VS as Validation Service
+    participant VS as EC Service
     participant PM as Policy Manager
     participant DB as PostgreSQL
     participant S3 as Object Storage
     participant Conf as Conforma CLI
 
-    User->>UI: Request SBOM validation for policy
-    UI->>API: POST /api/v2/sbom/{sbom_id}/validate
-    Note over UI,API: Request body: {policy_id}
+    User->>API: POST /api/v2/sbom/{sbom_id}/ec-validate {policy_id}
 
-    API->>VS: validate_sbom_against_policy(sbom_id, policy_id)
-
-    rect rgb(42, 48, 53)
-        Note over VS,PM: Policy Resolution Phase
-        VS->>PM: get_policy_configuration(policy_id)
-        PM->>DB: SELECT * FROM ec_policies WHERE id = ?
-        DB-->>PM: Policy configuration
-        alt Policy not found
-            PM-->>VS: Error: PolicyNotFound
-            VS-->>API: 404 Not Found
-            API-->>UI: Policy not found error
-            UI-->>User: Display error: "Policy does not exist"
-        end
-        PM-->>VS: PolicyConfig {name, policy_ref, version}
+    VS->>PM: get_policy_configuration(policy_id)
+    PM->>DB: SELECT * FROM ec_policies WHERE id = ?
+    alt Policy not found
+        PM-->>VS: Error: PolicyNotFound
+        VS-->>API: 404 Not Found
     end
+    PM-->>VS: PolicyConfig {name, policy_ref, type}
 
-    rect rgb(68, 66, 62)
-        Note over VS,S3: SBOM Retrieval Phase
-        VS->>DB: SELECT * FROM sbom WHERE id = ?
-        DB-->>VS: SBOM metadata
-        alt SBOM not found
-            VS-->>API: 404 Not Found
-            API-->>UI: SBOM not found error
-            UI-->>User: Display error: "SBOM does not exist"
-        end
-
-        VS->>S3: retrieve_sbom_document(sbom_id)
-        S3-->>VS: SBOM document (JSON/XML)
+    VS->>DB: SELECT * FROM sbom WHERE id = ?
+    alt SBOM not found
+        VS-->>API: 404 Not Found
     end
+    VS->>S3: retrieve_sbom_document(sbom_id)
+    S3-->>VS: SBOM document (JSON/XML)
 
-    rect rgb(42, 48, 53)
-        Note over VS,Conf: Validation Execution Phase
-        VS->>VS: Create temp files for SBOM and policy
-        VS->>Conf: spawn: conforma validate<br/>input --file "$1" --policy <URL><br/>--output json --show-successes<br/>--info
+    VS->>VS: Write SBOM to temp file
+    VS->>Conf: conforma validate input --file "$SBOM_PATH" --policy <URL> --output json --show-successes --info
 
-        alt Validation passes
-            Conf-->>VS: Exit code: 0<br/>JSON: {result: "PASS", violations: []}
-            VS->>VS: Parse validation results
-            VS->>DB: INSERT INTO ec_validation_results<br/>(sbom_id, policy_id, status='passed',<br/>violations=[], timestamp)
-            DB-->>VS: result_id
-            VS->>S3: store_validation_report(result_id, full_json)
-            S3-->>VS: report_url
-            VS->>DB: UPDATE ec_validation_results<br/>SET report_url = ?
-            DB-->>VS: Updated
-            VS-->>API: ValidationResult {status: "passed",<br/>violations: [], report_url}
-            API-->>UI: 200 OK {passed: true, violations: 0}
-            UI-->>User: ✓ SBOM passes policy validation
-
-        else Validation fails with violations
-            Conf-->>VS: Exit code: 1<br/>JSON: {result: "FAIL",<br/>violations: [{rule, severity, message}]}
-            VS->>VS: Parse validation results
-            VS->>DB: INSERT INTO ec_validation_results<br/>(sbom_id, policy_id, status='failed',<br/>violations=json, timestamp)
-            DB-->>VS: result_id
-            VS->>S3: store_validation_report(result_id, full_json)
-            S3-->>VS: report_url
-            VS->>DB: UPDATE ec_validation_results<br/>SET report_url = ?
-            DB-->>VS: Updated
-            VS-->>API: ValidationResult {status: "failed",<br/>violations: [...], report_url}
-            API-->>UI: 200 OK {passed: false, violations: [...]}
-            UI-->>User: ✗ SBOM violates policy<br/>Show violation details
-
-        else Conforma execution error
-            Conf-->>VS: Exit code: 2<br/>stderr: "Policy file not found"
-            VS->>DB: INSERT INTO ec_validation_results<br/>(sbom_id, policy_id, status='error',<br/>error_message=stderr)
-            DB-->>VS: result_id
-            VS-->>API: Error: ValidationExecutionFailed
-            API-->>UI: 500 Internal Server Error
-            UI-->>User: Display error: "Validation failed to execute"
-        end
+    alt Exit code 0 — pass
+        Conf-->>VS: {result: "PASS", violations: []}
+        VS->>DB: INSERT ec_validation_results (status='pass', violations=[], ...)
+        VS->>S3: store_validation_report(result_id, full_json)
+        VS->>DB: UPDATE SET report_url = ?
+        VS->>DB: UPDATE sbom SET policy_status = 'Accepted'
+        VS-->>API: 200 {passed: true, violations: 0, report_url}
+    else Exit code 1 — fail (policy violations)
+        Conf-->>VS: {result: "FAIL", violations: [{rule, severity, message}]}
+        VS->>DB: INSERT ec_validation_results (status='fail', violations=json, ...)
+        VS->>S3: store_validation_report(result_id, full_json)
+        VS->>DB: UPDATE SET report_url = ?
+        VS->>DB: UPDATE sbom SET policy_status = 'Rejected'
+        VS-->>API: 200 {passed: false, violations: [...], report_url}
+    else Exit code 2+ — execution error
+        Conf-->>VS: stderr: "Policy file not found"
+        VS->>DB: INSERT ec_validation_results (status='error', error_message=stderr)
+        Note over VS,DB: SBOM policy_status unchanged — stays Pending
+        VS-->>API: 500 {error: "Validation failed to execute", detail: stderr}
     end
 
     VS->>VS: Cleanup temp files
 ```
 
-### Data Model
+### The Data Model
 
-Two new tables:
-
-**`ec_policies`** - Store policy references and metadata (not the policies themselves)
-
-> **Note**: This table stores references to external policies (Git URLs, OCI registries, etc.) and local configuration metadata. The actual policy definitions remain in their external repositories (GitHub, GitLab, etc.) and are fetched by Conforma at validation time.
+**`ec_policies`** - Stores references to external policies, not the policies themselves
 
 - `id` (UUID, PK)
-- `name` (VARCHAR, unique) - User-friendly name for this policy configuration
-- `description` (TEXT) - Description of what this policy enforces
-- `policy_ref` (VARCHAR) - **External reference**: Git URL, OCI registry, or file path where policy is stored
-- `policy_type` (VARCHAR) - 'git', 'oci', 'local' (indicates how Conforma should fetch the policy)
-- `configuration` (JSONB) - Additional Conforma parameters (branch, tag, auth credentials, etc.)
+- `name` (VARCHAR, unique) - User-friendly name label
+- `description` (TEXT) - What this policy enforces
+- `policy_ref` (VARCHAR) - Git URL, OCI registry, or file path
+- `policy_type` (VARCHAR) - 'git', 'oci', 'local'
+- `configuration` (JSONB) - Branch, tag, auth credentials, etc.
 - `created_at`, `updated_at` (TIMESTAMP)
 
-**`ec_validation_results`** - Store validation outcomes
+**`ec_validation_results`** - one row per validation execution
 
 - `id` (UUID, PK)
 - `sbom_id` (UUID, FK → sbom)
 - `policy_id` (UUID, FK → ec_policies)
 - `status` (VARCHAR) - 'pass', 'fail', 'error'
-- `violations` (JSONB) - Structured violation data
-- `summary` (JSONB) - Statistics (total checks, passed, failed, warnings)
+- `violations` (JSONB) - Structured violation data for querying
+- `summary` (JSONB) - Total checks, passed, failed, warnings
 - `report_url` (VARCHAR) - S3 URL to detailed report
 - `executed_at` (TIMESTAMP)
 - `execution_duration_ms` (INTEGER)
-- `conforma_version` (VARCHAR)
-- `error_message` (TEXT)
+- `conforma_version` (VARCHAR) - For reproducibility
+- `error_message` (TEXT) - Populated only on error status
 
 ### API Endpoints
 
 ```
-POST   /api/v2/sboms/{id}/ec-validate       # Trigger validation
-GET    /api/v2/sboms/{id}/ec-report         # Get latest validation result
-GET    /api/v2/sboms/{id}/ec-report/history # Get validation history
-GET    /api/v2/ec/report/{result_id}        # Download detailed report
-POST   /api/v2/ec/policies                  # Create policy reference (admin)
-GET    /api/v2/ec/policies                  # List policy references
-GET    /api/v2/ec/policies/{id}             # Get policy reference details
-PUT    /api/v2/ec/policies/{id}             # Update policy reference (admin)
-DELETE /api/v2/ec/policies/{id}             # Delete policy reference (admin)
+POST   /api/v2/sboms/{id}/ec-validate         # Trigger validation
+GET    /api/v2/sboms/{id}/ec-report           # Get latest validation result
+GET    /api/v2/sboms/{id}/ec-report/history   # Get validation history
+GET    /api/v2/ec/report/{result_id}          # Download detailed report from S3
+
+POST   /api/v2/ec/policies                    # Create policy reference (admin)
+GET    /api/v2/ec/policies                    # List policy references
+GET    /api/v2/ec/policies/{id}               # Get policy reference
+PUT    /api/v2/ec/policies/{id}               # Update policy reference (admin)
+DELETE /api/v2/ec/policies/{id}               # Delete policy reference (admin)
 ```
 
-### Implementation Approach
+### Technical Considerations
 
-**Phase 1: Backend - CLI Integration**
+#### Conforma CLI Execution
 
-- Use async process spawning with proper timeout handling
-- Stream stdout/stderr for error capture
-- Parse Conforma JSON output into Rust structs
-- Handle exit codes (0=pass, 1=fail, 2=error)
-- Implement REST API endpoints for validation operations
-- Add database schema and migrations
-- Create service layer for orchestration
+Conforma is invoked via tokio::process::Command to avoid blocking the async runtime. All arguments are passed as an array — never as a shell string — to prevent CLI injection. Execution has a configurable timeout (default 5 minutes); large SBOMs are streamed to a temp file and passed by path rather than piped via stdin, which avoids OOM issues with the parent process.
 
-**Phase 2: Frontend - GUI Development**
+Exit codes are treated as follows: 0 = pass, 1 = policy violations (expected failure, not an error), 2+ = execution error. It is important to distinguish 1 from 2+ in error handling — a policy violation is a valid result that should be surfaced to the user, not treated as a system failure.
 
-- **SBOM Details View Enhancements**:
-  - Add "Validate with EC" button/action in SBOM detail page
-  - Display compliance status badge (Pass/Fail/Error) prominently
-  - Show latest validation timestamp and policy used
-- **Validation Results Display**:
-  - Create dedicated compliance tab/section in SBOM view
-  - Display validation summary (total checks, passed, failed, warnings)
-  - List violations with severity, description, and remediation hints
-  - Provide expandable/collapsible violation details
-- **Validation History**:
-  - Show historical validation results in timeline view
-  - Allow filtering by policy, status, and date range
-  - Display trend charts for compliance over time
-- **Policy Management UI** (Admin):
-  - Policy reference configuration page (store Git URLs, OCI refs, etc.)
-  - List view of available policy references with descriptions and types
-  - Policy selection dialog when triggering validation
-  - Form validation for policy references (validate Git URL format, test connectivity)
-  - Display policy source (GitHub, GitLab, OCI registry) with clickable links
-- **Report Download**:
-  - Download button for detailed JSON/HTML reports
-  - Preview detailed report in modal or new page
-  - Export options (JSON, PDF, HTML)
-- **Notifications & Feedback**:
-  - Loading indicators during validation execution
-  - Toast notifications for validation completion
-  - Error messages with actionable guidance
-  - Progress tracking for long-running validations
+Temp files (SBOM, any cached policy material) are cleaned up in a finally-equivalent block regardless of execution outcome, including on timeout.
 
-**Phase 3: Future API Migration**
+#### Concurrency and Backpressure
 
-When Conforma provides a REST API:
+Concurrent Conforma processes are bounded by a semaphore (default: 5). When the semaphore is exhausted, incoming validation requests return 429 Too Many Requests immediately rather than queuing or blocking indefinitely. This makes the capacity limit explicit to callers (e.g. CI pipelines can implement their own retry with backoff). If demand grows to warrant it, a proper queue (Redis/RabbitMQ) is the deferred alternative considered below.
 
-- Implement adapter pattern to switch between CLI and API
-- Add feature flag `ec-api-mode` for gradual migration
-- Maintain backward compatibility with CLI mode
-- Deprecate CLI integration after stable API adoption
-- No GUI changes required (transparent backend switch)
+#### Policy Management
+
+ec_policies stores external references only. Conforma fetches the actual policy at validation time, which means Trustify does not cache policy content by default. The trade-off: validation always uses the latest policy version, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the configuration JSONB column and must be encrypted at rest; they are never logged.
+
+Policy version/commit hash is recorded in the conforma_version field of each result row, enabling reproducibility and audit.
+
+#### Multi-tenancy
+
+Policy references are global (shared across all users) in this initial implementation. Per-organization policy namespacing is out of scope here and should be addressed in a dedicated multi-tenancy ADR when Trustify adds org-level isolation more broadly.
+
+#### Data Retention
+
+Validation results accumulate over time. A retention policy (default: 90 days, configurable) should be implemented to prune old ec_validation_results rows and their corresponding S3 reports. This is deferred to the implementation phase but must be included before production rollout.
 
 ### Module Structure
 
@@ -382,185 +359,9 @@ modules/ec/
     └── error.rs                # Error types
 ```
 
-### Technical Considerations
-
-**Conforma CLI Execution**
-
-- Use `tokio::process::Command` for async execution to avoid blocking the runtime
-- Stream stdout/stderr for real-time monitoring and logging
-- Set execution timeouts (default: 5 minutes, configurable per policy)
-- Handle large SBOM files efficiently by streaming to temporary files
-- Capture exit codes for error handling (0=pass, 1=fail, 2+=error)
-- Sanitize all CLI arguments to prevent injection attacks (use process args array, not shell strings)
-
-**Policy Management**
-
-- Support multiple policy types: Git repositories, OCI registries, local file paths
-- Cache policy files locally to avoid repeated fetches from external sources
-- Validate policy references before execution (check URL format, test connectivity)
-- Track policy version/commit when storing validation results for reproducibility
-- Support authentication for private policy repositories (tokens, SSH keys)
-
-**Result Storage**
-
-- Store structured violations in JSONB for efficient querying (filter by violation type, severity)
-- Keep detailed reports in object storage (S3/Minio) to minimize database size
-- Implement retention policies for old validation results (configurable, e.g., 90 days)
-- Index frequently queried fields (sbom_id, status, executed_at) for performance
-- Consider result aggregation for analytics dashboards
-
-**Error Handling**
-
-- Distinguish between validation failures (policy violations) and execution errors (CLI crashes)
-- Provide actionable error messages to users (e.g., "Policy file not found at URL")
-- Implement retry logic for transient failures (network timeouts, temporary service unavailability)
-- Log all execution details for debugging (command, arguments, duration, exit code)
-- Gracefully degrade when Conforma is unavailable (show cached results, queue for retry)
-
-**Security**
-
-- Validate and sanitize all user inputs (policy URLs, SBOM IDs)
-- Restrict policy sources to trusted domains (configurable allowlist)
-- Store authentication credentials securely (encrypted, never in logs)
-- Implement proper authorization checks (only admins can modify policies)
-- Audit log all validation executions and policy modifications
-
-**Performance**
-
-- Limit concurrent Conforma executions using semaphore (default: 5 concurrent)
-- Implement queueing for validation requests during high load
-- Cache policy files to reduce external network calls
-- Use connection pooling for database operations
-- Monitor execution times and resource usage for capacity planning
-- Consider horizontal scaling for validation workloads
-
-## Consequences
-
-### Positive
-
-1. **Automated Policy Enforcement**: Organizations can automatically validate SBOMs without manual review
-2. **Audit Trail**: Complete history of compliance checks stored in database
-3. **Flexibility**: Support multiple policy configurations for different requirements
-4. **Integration Ready**: REST API enables integration with CI/CD pipelines
-5. **Scalability**: Async execution prevents blocking on long-running validations
-6. **Extensibility**: Module design allows future enhancement (webhooks, notifications, etc.)
-7. **Open Source**: Conforma is open-source and actively maintained
-
-### Trade-offs and Risks
-
-| Trade-off / Risk                | Impact                                   | Mitigation                                                                 |
-| ------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------- |
-| External CLI dependency         | Requires Conforma installed on servers   | Health checks, graceful error handling, retry logic                        |
-| Process spawning overhead       | Performance implications per validation  | Async execution with configurable timeouts (default: 5 min)                |
-| Error handling complexity       | CLI failures, timeouts, malformed output | Distinguish validation failures from execution errors; actionable messages |
-| Version management              | Conforma version compatibility           | Document required version, validate on startup                             |
-| Resource usage under load       | Concurrent validations consume resources | Semaphore limits (default: 5), queueing, monitoring                        |
-| No native API yet               | CLI less efficient than REST integration | Adapter pattern for future API migration (see Phase 3)                     |
-| Large SBOMs cause memory issues | Out-of-memory during validation          | Stream SBOM to temp file, pass file path to Conforma                       |
-| CLI injection attacks           | Security vulnerability                   | Sanitize all inputs, use process args array (not shell strings)            |
-| Storage costs for reports       | Growing storage over time                | Retention policies, report compression                                     |
-
-## Alternatives Considered
-
-### 1. In-Process Policy Engine
-
-**Pros**: No external dependencies, faster execution, native Rust integration
-
-**Cons**: Requires reimplementing Enterprise Contract logic, maintenance burden, divergence from upstream
-
-**Verdict**: Rejected - maintaining policy engine parity with EC would be significant effort
-
-### 2. Webhook-based Integration
-
-**Pros**: Decoupled, scalable, easier to manage separate service
-
-**Cons**: Additional infrastructure, network latency, complexity for simple use case
-
-**Verdict**: Deferred - could be future enhancements for large-scale deployments
-
-### 3. Embedded WASM Module
-
-**Pros**: Sandboxed, portable, no process spawning
-
-**Cons**: Conforma not available as WASM, would require major upstream changes
-
-**Verdict**: Rejected - not feasible with current Conforma implementation
-
-### 4. Batch Processing Queue
-
-**Pros**: Better resource management, retry logic, priority handling
-
-**Cons**: Adds complexity, requires queue infrastructure (Redis/RabbitMQ)
-
-**Verdict**: Deferred - implement if demand increases, start with simple async execution
-
-## References
+### References
 
 - [Enterprise Contract (Conforma) GitHub](https://github.com/enterprise-contract/ec-cli)
-- [Conforma CLI Documentation](https://github.com/enterprise-contract/ec-cli)
 - [Design Document](../design/enterprise-contract-integration.md)
 - [ADR-00005: Upload API for UI](./00005-ui-upload.md) - Similar async processing pattern
 - [ADR-00001: Graph Analytics](./00001-graph-analytics.md) - Database query patterns
-
-## Implementation Tracking
-
-### Backend Tasks
-
-- [ ] Create module structure under `modules/ec`
-- [ ] Implement database migrations for new tables (`ec_policies`, `ec_validation_results`)
-- [ ] Build Conforma CLI executor with async process handling
-- [ ] Create result parser for JSON output
-- [ ] Implement policy manager service
-- [ ] Implement EC service orchestration layer
-- [ ] Add REST API endpoints (validation, results, policies)
-- [ ] Write unit and integration tests
-- [ ] Add OpenAPI documentation
-- [ ] Write deployment documentation (Conforma installation)
-- [ ] Add monitoring and metrics (execution times, success rates)
-- [ ] Implement error handling and retry logic
-- [ ] Add authentication/authorization checks
-
-### Frontend Tasks
-
-- [ ] Add "Validate with EC" button to SBOM detail page
-- [ ] Create compliance status badge component (Pass/Fail/Error)
-- [ ] Implement validation results display with summary statistics
-- [ ] Build violations list component with expandable details
-- [ ] Create validation history timeline view
-- [ ] Add policy reference management UI (admin pages)
-  - [ ] Policy reference list view with search/filter (shows name, external URL, type)
-  - [ ] Policy reference create/edit form (Git URL, OCI ref, auth config)
-  - [ ] Policy reference delete confirmation
-  - [ ] Test policy connectivity button (validate URL is reachable)
-- [ ] Add report download functionality (JSON/HTML)
-- [ ] Create detailed report preview modal
-- [ ] Implement loading indicators for validation execution
-- [ ] Add toast notifications for validation completion/errors
-- [ ] Create compliance trend charts (optional, if analytics desired)
-- [ ] Add help tooltips and documentation links
-- [ ] Ensure responsive design for mobile/tablet views
-- [ ] Add accessibility features (ARIA labels, keyboard navigation)
-
-## Open Questions
-
-1. **Policy Storage & Caching**: Should policies be pulled from external sources (OCI registry, Git repository) at runtime, or should Trustify cache them locally? Should we rely on Conforma's built-in caching or implement our own? How to handle cache invalidation and TTL for cached policies?
-
-2. **Trigger Mechanism**: Should the EC validation run automatically immediately upon SBOM upload, or will this be a manually triggered/scheduled process? Should users be able to configure auto-validation per SBOM or globally?
-
-3. **Data Granularity**: Do we store the full raw JSON output from Conforma, or only a summary (Pass/Fail) and a list of specific policy violations to save database space? What's the trade-off between storage cost and audit completeness?
-
-4. **Conforma Versioning**: Which version of the Conforma CLI are we targeting initially, and how will we handle updates to the policy engine? Should we support multiple Conforma versions concurrently or enforce a single version?
-
-5. **Policy Source Security**: Should we validate/verify Git repository signatures for policy sources? How to handle private repositories requiring authentication (tokens, SSH keys)?
-
-6. **Multi-tenancy**: How to isolate policy references per organization in shared Trustify deployments? Should each organization have separate policy namespaces?
-
-7. **Rate Limiting**: Should we limit validation requests per user/organization to prevent resource exhaustion? What are reasonable limits?
-
-8. **Notifications**: Should validation results trigger notifications (email, webhook, Slack)? Should notifications be configurable per policy or per SBOM?
-
-9. **Automatic Re-validation**: Should we re-validate SBOMs when policy definitions are updated in their external repositories? How to detect policy changes (polling, webhooks)?
-
-10. **UI/UX**: Where in the UI should compliance status be most prominently displayed? Should we show compliance badges on SBOM list views or only in detail views?
-
-11. **Default Policies**: Should there be system-wide default policy references that apply to all SBOMs unless overridden? How to handle precedence (user-level vs org-level vs system-level)?
