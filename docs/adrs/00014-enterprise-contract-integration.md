@@ -142,6 +142,9 @@ C4Container
 
     Container_Boundary(conforma, "Conforma System") {
         System_Ext(conforma, "Conforma CLI", "External policy validation tool")
+    }
+
+    Container_Boundary(policyRepo, "Policy System") {
         System_Ext(policyRepo, "Policy Repository", "Git repository with EC policies")
     }
 
@@ -161,7 +164,7 @@ C4Container
     UpdateRelStyle(ecModule, postgres, $offsetX="-40", $offsetY="10")
     UpdateRelStyle(storage, s3, $offsetX="-40", $offsetY="10")
 
-    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="3")
+    UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
 
 ### Container Diagram
