@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1770888917873,
+  "lastUpdate": 1771401682747,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14731,6 +14731,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 10,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "083ccfe050d71b1086f7ac277a9de0506000a729",
+          "message": "feat: add xz to the xtask container\n\nWhen generating dumps using that container, having xz can create smaller\ndumps.",
+          "timestamp": "2026-02-17T20:58:05Z",
+          "tree_id": "a559b4f5cddb837036ec1453365cf944a6a3b8d7",
+          "url": "https://github.com/gildub/trustify/commit/083ccfe050d71b1086f7ac277a9de0506000a729"
+        },
+        "date": 1771401681258,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 11,
             "unit": "s"
           }
         ]
