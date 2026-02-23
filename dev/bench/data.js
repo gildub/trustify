@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1771401682747,
+  "lastUpdate": 1771837439959,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14760,6 +14760,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 11,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "bb24af96565e987f69896493ce53fbad4111e5ff",
+          "message": "chore: handle case up duplicate group IDs\n\nAssisted-by: Claude Code",
+          "timestamp": "2026-02-19T14:05:30Z",
+          "tree_id": "a15d1fb6c52eb25067afdaf8d7c7d1d3054f0be9",
+          "url": "https://github.com/gildub/trustify/commit/bb24af96565e987f69896493ce53fbad4111e5ff"
+        },
+        "date": 1771837438578,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
             "unit": "s"
           }
         ]
