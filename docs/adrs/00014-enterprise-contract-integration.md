@@ -16,7 +16,7 @@ Enterprise Contract (Conforma) is an open-source policy enforcement tool activel
 
 Users need the ability to:
 
-1. Automatically validate SBOMs against organizational policies
+1. Validate SBOMs against organizational policies
 2. Define and manage multiple policy configurations
 3. View compliance status and violation details for each SBOM
 4. Track compliance history over time
@@ -29,6 +29,13 @@ We will integrate Conforma into Trustify as an optional validation service by sp
 Validation is manually triggered — not automatic on SBOM upload.  
 Validation on upload is deferred to a follow-up version.
 
+Uploaded SBOMs start in "Pending" status and are not discoverable until validated. EC validation is one mechanism by which an SBOM can move from "Pending" to "Accepted" or "Rejected":
+
+- An SBOM in "Pending" can be submitted for EC validation.
+- A passing EC result transitions the SBOM to "Accepted".
+- A failing EC result transitions it to "Rejected", with the violation details linked.
+- An EC execution error (CLI crash, policy fetch failure) does not change the SBOM's policy status — the SBOM stays Pending and the error is surfaced separately, so it doesn't silently block an SBOM.
+
 What is stored where
 
 - PostgreSQL: validation status, structured violations (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, status, executed_at.
@@ -36,18 +43,6 @@ What is stored where
 - Not stored: the policy definitions themselves. ec_policies stores references (URLs, OCI refs) that Conforma fetches at runtime.
 
 Storing full JSON in S3 rather than only a summary was chosen explicitly to preserve audit completeness — callers can always fetch the raw report. The DB violations JSONB holds enough structure for filtering and dashboards without duplicating the full payload.
-
-### Deferred Validation
-
-I has been decided that uploaded SBOMs start in "Pending" status and are not discoverable until validated.
-EC validation is one mechanism by which an SBOM can move from "Pending" to "Accepted" or "Rejected".
-
-Concretely:
-
-    An SBOM in "Pending" can be submitted for EC validation.
-    A passing EC result transitions the SBOM to "Accepted".
-    A failing EC result transitions it to "Rejected", with the violation details linked.
-    An EC execution error (CLI crash, policy fetch failure) does not change the SBOM's policy status — the SBOM stays Pending and the error is surfaced separately, so it doesn't silently block an SBOM.
 
 ## Consequences
 
@@ -271,7 +266,7 @@ sequenceDiagram
 
 ### The Data Model
 
-**`ec_policies`** - Stores references to external policies, not the policies themselves
+**`ec_policy`** - Stores references to external policies, not the policies themselves
 
 - `id` (UUID, PK)
 - `name` (VARCHAR, unique) - User-friendly name label
