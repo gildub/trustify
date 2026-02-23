@@ -329,10 +329,6 @@ Policy version/commit hash is recorded in the conforma_version field of each res
 
 Policy references are global (shared across all users) in this initial implementation. Per-organization policy namespacing is out of scope here and should be addressed in a dedicated multi-tenancy ADR when Trustify adds org-level isolation more broadly.
 
-#### Data Retention
-
-Validation results accumulate over time. A retention policy (default: 90 days, configurable) should be implemented to prune old ec_validation_results rows and their corresponding S3 reports. This is deferred to the implementation phase but must be included before production rollout.
-
 ### Module Structure
 
 ```
