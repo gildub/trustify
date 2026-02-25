@@ -25,9 +25,12 @@ Users need the ability to:
 
 ## Decision
 
-We will integrate Conforma into Trustify as an optional validation service by spawning the Conforma CLI asynchronously.  
+We will integrate Conforma into Trustify as a user triggered validation service by interacting with Conforma CLI.  
 Validation is manually triggered — not automatic on SBOM upload.  
 Validation on upload is deferred to a follow-up version.
+
+Conforma CLI is deployed separately from Trustify as either a standalone container or equivalent.
+A HTTP wrapper will act as a proxy between Trustify EC service and Conforma CLI.
 
 Uploaded SBOMs start in "Pending" status and are not discoverable until validated. EC validation is one mechanism by which an SBOM can move from "Pending" to "Accepted" or "Rejected":
 
@@ -46,29 +49,11 @@ Storing full JSON in S3 rather than only a summary was chosen explicitly to pres
 
 ## Consequences
 
+Using a HTTP API wrapper decouples the validation process into a external service.
+This will better catter for large-scale deployments as EC validation has its own constraint.
+Meanwhile it adds infrastructure complexity as the Webhook will need to be deployed alongside the EC system
+
 Integrating via CLI spawning rather than a native API introduces an external process dependency that adds operational overhead (Conforma must be installed and version-pinned on every server) and per-validation process spawning overhead. These are accepted trade-offs given that no Conforma API exists yet. The executor is built behind an adapter interface so the implementation can be swapped for a REST client in Phase 3 without changes to the service layer or API.
-
-### Trade-off/Risk & Mitigation
-
-- Conforma must be installed on servers
-  - Health check on startup
-  - graceful degradation showing cached results
-- Process spawn overhead per validation
-  - Async execution; configurable timeout (default 5 min)
-- CLI injection attacks
-  - Args array only, never shell strings; all user inputs sanitized
-- Version compatibility
-  - Document required Conforma version; validate on startup
-- Concurrent load exhausting resources
-  - Semaphore (default: 5)
-  - 429 on exhaustion
-- No native API yet
-  - Adapter pattern for future migration (Phase 3)
-- Large SBOMs causing OOM
-  - Stream to temp file
-  - pass path to Conforma
-- Growing S3 storage costs
-  - Retention policy (90-day default)
 
 ### Alternatives Considered
 
@@ -76,9 +61,9 @@ Integrating via CLI spawning rather than a native API introduces an external pro
 
 Reimplementing Enterprise Contract logic in Rust would diverge from upstream and create significant maintenance burden.
 
-#### Webhook-based Integration: Deferred
+#### Direct Integration: Rejected
 
-Decouples validation into a separate service, which is better for large-scale deployments but adds infrastructure complexity premature for initial scope.
+Couple validation integrated within Trustify service through a directly controlled component was simpler but worse for large-scale deployments.
 
 #### Embedded WASM Module: Rejected
 
@@ -168,19 +153,23 @@ C4Container
 C4Component
     title EC Validation Module - Component Diagram
 
-    Container(api, "API Gateway", "Actix-web", "REST API for EC operations")
-
-    Container_Boundary(ecModule, "EC Validation Module") {
-        Component(ecEndpoints, "EC Endpoints", "Actix-web handlers", "REST endpoints for validation operations")
-        Component(conformaExecutor, "Conforma Executor", "Async Process", "Spawns Conforma CLI and captures output")
-        Component(ecService, "EC Service", "Business logic", "Orchestrates validation workflow")
-        Component(resultParser, "Result Parser", "JSON parser", "Parses Conforma output into structured data")
-        Component(policyManager, "Policy Manager", "Business logic", "Manages EC policy references and configuration")
-        Component(resultPersistence, "Result Persistence", "Database layer", "Saves validation results")
+    Deployment_Node(trustifySystem, "Trustify System") {
+        Container(api, "API Gateway", "Actix-web", "REST API for EC operations")
+        Container_Boundary(ecModule, "EC Validation Module") {
+            Container(ecEndpoints, "EC Endpoints", "Actix-web handlers", "REST endpoints for validation operations")
+            Component(ecService, "EC Service", "Business logic", "Orchestrates validation workflow")
+            Component(resultParser, "Result Parser", "JSON parser", "Parses Conforma output into structured data")
+            Component(policyManager, "Policy Manager", "Business logic", "Manages EC policy references and<br/>configuration")
+            Component(resultPersistence, "Result Persistence", "Database layer", "Saves validation results")
+        }
     }
-
-    Container_Boundary(external, "External System") {
-        System_Ext(conforma, "Conforma CLI", "Enterprise Contract validation tool")
+    Deployment_Node(external, "External System") {
+        Deployment_Node(trustifyPod, "Trustify Pod") {
+            Component(conformaECWrapper, "EC Wrapper", "HTTP API/Webhook")
+        }
+        Deployment_Node(conformaPod, "Conforma Pod") {
+            System_Ext(conforma, "Conforma CLI", "Enterprise Contract validation tool")
+        }
     }
 
     Container_Boundary(dbms, "Database") {
@@ -194,17 +183,19 @@ C4Component
     Rel(ecEndpoints, ecService, "validate_sbom() / get_ec_report()", "Function call")
     Rel(ecService, policyManager, "get_policy_config()", "Function call")
     Rel(policyManager, postgres, "SELECT ec_policies", "SQL")
-    Rel(ecService, conformaExecutor, "request_validation()", "Function call")
-    Rel(conformaExecutor, conforma, "Runs CLI command", "Process spawn")
+    Rel(ecService, conformaECWrapper, "POST /api/v1/validation", "HTTP")
+    Rel(conformaECWrapper, conforma, "ec validate", "Process spawn")
     Rel(ecService, resultParser, "parse_output()", "Function call")
     Rel(ecService, resultPersistence, "save_results()", "Function call")
     Rel(resultPersistence, postgres, "INSERT ec_validation_results", "SQL")
     Rel(ecService, s3, "Store EC report", "S3 API")
 
     UpdateRelStyle(api, ecEndpoints, $offsetX="-50", $offsetY="-50")
+    UpdateRelStyle(ecEndpoints, ecService, $offsetX="-60", $offsetY="+40")
+    UpdateRelStyle(ecService, resultParser, $offsetX="-60", $offsetY="+0")
+    UpdateRelStyle(ecService, resultPersistence, $offsetX="-60", $offsetY="+80")
 
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
-
 ```
 
 ### The main sequence Diagram
