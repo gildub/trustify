@@ -32,12 +32,15 @@ Validation on upload is deferred to a follow-up version.
 Conforma CLI is deployed separately from Trustify as either a standalone container or equivalent.
 A HTTP wrapper will act as a proxy between Trustify EC service and Conforma CLI.
 
-Uploaded SBOMs start in "Pending" status and are not discoverable until validated. EC validation is one mechanism by which an SBOM can move from "Pending" to "Accepted" or "Rejected":
+Each SBOM + policy pair has a validation state that follows this lifecycle:
 
-- An SBOM in "Pending" can be submitted for EC validation.
-- A passing EC result transitions the SBOM to "Accepted".
-- A failing EC result transitions it to "Rejected", with the violation details linked.
-- An EC execution error (CLI crash, policy fetch failure) does not change the SBOM's policy status — the SBOM stays Pending and the error is surfaced separately, so it doesn't silently block an SBOM.
+- **Pending** — default state when an SBOM is uploaded. No validation has been triggered yet for this SBOM against this policy.
+- **In Progress** — a user has triggered validation; the request is being processed. Other users can see this state, preventing duplicate validation runs for the same SBOM + policy pair.
+- **Pass** — Conforma validation succeeded; the SBOM satisfies the policy.
+- **Fail** — Conforma validation found policy violations; violation details are linked.
+- **Error** — an execution error occurred (CLI crash, policy fetch failure, timeout). The error is surfaced separately, and the validation can be re-triggered.
+
+The "In Progress" state serves as a concurrency guard: if a validation is already running for a given SBOM + policy pair, subsequent requests are rejected (409 Conflict), preventing duplicate work.
 
 What is stored where
 
@@ -133,7 +136,8 @@ C4Container
     Rel(user, api, "Views compliance status", "HTTP API")
     Rel(webui, api, "API calls", "JSON/HTTP API")
     Rel(api, ecModule, "Triggers validation", "Function call")
-    Rel(ecModule, ecWrapper, "POST /validate {SBOM} {policy}", "HTTP API")
+    Rel(ecModule, ecWrapper, "POST /api/v1/validation {SBOM, policy_ref}<br/>← returns validation_id", "HTTP API")
+    Rel(ecWrapper, api, "POST /api/v2/ec/validation/{validation_id}/result", "HTTP callback")
     Rel(ecWrapper, conforma, "ec validate input {SBOM} {policy}", "Spawned command")
     Rel(ecModule, postgres, "Saves validation<br/>results", "SQL")
     Rel(ecModule, storage, "Stores EC reports", "Function call")
@@ -186,9 +190,9 @@ C4Component
     Rel(ecEndpoints, ecService, "validate_sbom() / get_ec_report()", "Function call")
     Rel(ecService, policyManager, "get_policy_config()", "Function call")
     Rel(policyManager, postgres, "SELECT ec_policies", "SQL")
-    Rel(ecService, ecWrapper, "POST /api/v1/validation", "HTTP + callback URL")
+    Rel(ecService, ecWrapper, "POST /api/v1/validation → returns validation_id", "HTTP")
     Rel(ecWrapper, conforma, "ec validate", "Process spawn")
-    Rel(ecWrapper, ecEndpoints, "POST /validate/job/{id}", "JSON/HTTPS")
+    Rel(ecWrapper, api, "POST /api/v2/ec/validation/{validation_id}/result", "JSON/HTTPS")
     Rel(ecService, resultParser, "parse_output()", "Function call")
     Rel(ecService, resultPersistence, "save_results()", "Function call")
     Rel(resultPersistence, postgres, "INSERT ec_validation_results", "SQL")
@@ -197,68 +201,108 @@ C4Component
     UpdateRelStyle(api, ecEndpoints, $offsetX="-50", $offsetY="-50")
     UpdateRelStyle(ecEndpoints, ecService, $offsetX="-60", $offsetY="+40")
     UpdateRelStyle(ecService, ecWrapper, $offsetX="-20", $offsetY="10")
-    UpdateRelStyle(ecWrapper, ecEndpoints, $offsetX="20", $offsetY="-40")
+    UpdateRelStyle(ecWrapper, api, $offsetX="20", $offsetY="-40")
     UpdateRelStyle(ecService, resultParser, $offsetX="-60", $offsetY="+0")
     UpdateRelStyle(ecService, resultPersistence, $offsetX="-60", $offsetY="+80")
 
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
 
-### The main sequence Diagram
+### Sequence Diagram — User Request (synchronous)
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User
     participant API as Trustify API
+    participant EP as EC Endpoints
     participant VS as EC Service
     participant PM as Policy Manager
     participant DB as PostgreSQL
     participant S3 as Object Storage
-    participant Conf as Conforma CLI
+    participant Wrapper as EC Wrapper (HTTP)
 
     User->>API: POST /api/v2/sbom/{sbom_id}/ec-validate {policy_id}
+    API->>EP: dispatch request
+    EP->>VS: validate_sbom(sbom_id, policy_id)
 
     VS->>PM: get_policy_configuration(policy_id)
     PM->>DB: SELECT * FROM ec_policies WHERE id = ?
     alt Policy not found
         PM-->>VS: Error: PolicyNotFound
-        VS-->>API: 404 Not Found
+        VS-->>EP: 404 Not Found
+        EP-->>API: 404 Not Found
     end
     PM-->>VS: PolicyConfig {name, policy_ref, type}
 
     VS->>DB: SELECT * FROM sbom WHERE id = ?
     alt SBOM not found
-        VS-->>API: 404 Not Found
+        VS-->>EP: 404 Not Found
+        EP-->>API: 404 Not Found
     end
+
+    VS->>DB: SELECT * FROM ec_validation_results WHERE sbom_id = ? AND policy_id = ? AND status = 'in_progress'
+    alt Validation already in progress
+        VS-->>EP: 409 Conflict {existing job_id}
+        EP-->>API: 409 Conflict
+        API-->>User: 409 Conflict — validation already in progress
+    end
+
     VS->>S3: retrieve_sbom_document(sbom_id)
     S3-->>VS: SBOM document (JSON/XML)
 
-    VS->>VS: Write SBOM to temp file
-    VS->>Conf: conforma validate input --file "$SBOM_PATH" --policy <URL> --output json --show-successes --info
+    VS->>Wrapper: POST /api/v1/validation {SBOM, policy_ref}
+    Wrapper-->>VS: 202 Accepted {validation_id}
+
+    VS->>DB: INSERT ec_validation_results (status='in_progress', sbom_id, policy_id, validation_id, ...)
+    VS-->>EP: 202 Accepted {validation_id}
+    EP-->>API: 202 Accepted {validation_id}
+    API-->>User: 202 Accepted {validation_id}
+```
+
+### Sequence Diagram — Async Validation Processing
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant API as Trustify API
+    participant EP as EC Endpoints
+    participant VS as EC Service
+    participant DB as PostgreSQL
+    participant S3 as Object Storage
+    participant Wrapper as EC Wrapper (HTTP)
+    participant Conf as Conforma CLI
+
+    Note over Wrapper: Wrapper holds validation_id from the initial request
+
+    Wrapper->>Wrapper: Write SBOM to temp file
+    Wrapper->>Conf: ec validate input --file "$SBOM_PATH" --policy <URL> --output json --show-successes --info
 
     alt Exit code 0 — pass
-        Conf-->>VS: {result: "PASS", violations: []}
-        VS->>DB: INSERT ec_validation_results (status='pass', violations=[], ...)
-        VS->>S3: store_validation_report(result_id, full_json)
-        VS->>DB: UPDATE SET report_url = ?
-        VS->>DB: UPDATE sbom SET policy_status = 'Accepted'
-        VS-->>API: 200 {passed: true, violations: 0, report_url}
+        Conf-->>Wrapper: {result: "PASS", violations: []}
     else Exit code 1 — fail (policy violations)
-        Conf-->>VS: {result: "FAIL", violations: [{rule, severity, message}]}
-        VS->>DB: INSERT ec_validation_results (status='fail', violations=json, ...)
-        VS->>S3: store_validation_report(result_id, full_json)
-        VS->>DB: UPDATE SET report_url = ?
-        VS->>DB: UPDATE sbom SET policy_status = 'Rejected'
-        VS-->>API: 200 {passed: false, violations: [...], report_url}
+        Conf-->>Wrapper: {result: "FAIL", violations: [{rule, severity, message}]}
     else Exit code 2+ — execution error
-        Conf-->>VS: stderr: "Policy file not found"
-        VS->>DB: INSERT ec_validation_results (status='error', error_message=stderr)
-        Note over VS,DB: SBOM policy_status unchanged — stays Pending
-        VS-->>API: 500 {error: "Validation failed to execute", detail: stderr}
+        Conf-->>Wrapper: stderr: "Policy file not found"
     end
 
-    VS->>VS: Cleanup temp files
+    Wrapper->>Wrapper: Cleanup temp files
+    Wrapper->>API: POST /api/v2/ec/validation/{validation_id}/result {conforma JSON output}
+    API->>EP: dispatch callback
+    EP->>VS: process_validation_result(validation_id, result)
+
+    alt Pass
+        VS->>DB: UPDATE ec_validation_results SET status='pass', violations=[]
+        VS->>S3: store_validation_report(result_id, full_json)
+        VS->>DB: UPDATE SET report_url = ?
+    else Fail
+        VS->>DB: UPDATE ec_validation_results SET status='fail', violations=json
+        VS->>S3: store_validation_report(result_id, full_json)
+        VS->>DB: UPDATE SET report_url = ?
+    else Error
+        VS->>DB: UPDATE ec_validation_results SET status='error', error_message=detail
+        Note over VS,DB: Validation can be re-triggered (new request will create a new row with status='in_progress')
+    end
 ```
 
 ### The Data Model
@@ -276,9 +320,10 @@ sequenceDiagram
 **`ec_validation_results`** - one row per validation execution
 
 - `id` (UUID, PK)
+- `validation_id` (VARCHAR, unique) - ID returned by the EC Wrapper, used for callback correlation
 - `sbom_id` (UUID, FK → sbom)
 - `policy_id` (UUID, FK → ec_policies)
-- `status` (VARCHAR) - 'pass', 'fail', 'error'
+- `status` (VARCHAR) - 'pending', 'in_progress', 'pass', 'fail', 'error'
 - `violations` (JSONB) - Structured violation data for querying
 - `summary` (JSONB) - Total checks, passed, failed, warnings
 - `report_url` (VARCHAR) - S3 URL to detailed report
@@ -290,16 +335,39 @@ sequenceDiagram
 ### API Endpoints
 
 ```
-POST   /api/v2/sboms/{id}/ec-validate         # Trigger validation
-GET    /api/v2/sboms/{id}/ec-report           # Get latest validation result
-GET    /api/v2/sboms/{id}/ec-report/history   # Get validation history
-GET    /api/v2/ec/report/{result_id}          # Download detailed report from S3
+POST   /api/v2/sboms/{id}/ec-validate                      # Trigger validation
+GET    /api/v2/sboms/{id}/ec-report                       # Get latest validation result
+GET    /api/v2/sboms/{id}/ec-report/history               # Get validation history
+GET    /api/v2/ec/report/{result_id}                      # Download detailed report from S3
+POST   /api/v2/ec/validation/{validation_id}/result       # Callback: EC Wrapper posts Conforma result
 
 POST   /api/v2/ec/policies                    # Create policy reference (admin)
 GET    /api/v2/ec/policies                    # List policy references
 GET    /api/v2/ec/policies/{id}               # Get policy reference
 PUT    /api/v2/ec/policies/{id}               # Update policy reference (admin)
 DELETE /api/v2/ec/policies/{id}               # Delete policy reference (admin)
+```
+
+### Module Structure
+
+```
+modules/ec/
+├── Cargo.toml
+└── src/
+    ├── lib.rs
+    ├── endpoints/
+    │   └── mod.rs              # REST endpoints
+    ├── model/
+    │   ├── mod.rs
+    │   ├── policy.rs           # Policy API models
+    │   └── validation.rs       # Validation result models
+    ├── service/
+    │   ├── mod.rs
+    │   ├── ec_service.rs       # Main orchestration
+    │   ├── policy_manager.rs   # Policy configuration
+    │   ├── executor.rs         # Conforma CLI execution
+    │   └── result_parser.rs    # Output parsing
+    └── error.rs                # Error types
 ```
 
 ### Technical Considerations
@@ -326,26 +394,50 @@ Policy version/commit hash is recorded in the conforma_version field of each res
 
 Policy references are global (shared across all users) in this initial implementation. Per-organization policy namespacing is out of scope here and should be addressed in a dedicated multi-tenancy ADR when Trustify adds org-level isolation more broadly.
 
-### Module Structure
+### Structure of JSON returned from Conformat CLI validation request (from an example)
 
-```
-modules/ec/
-├── Cargo.toml
-└── src/
-    ├── lib.rs
-    ├── endpoints/
-    │   └── mod.rs              # REST endpoints
-    ├── model/
-    │   ├── mod.rs
-    │   ├── policy.rs           # Policy API models
-    │   └── validation.rs       # Validation result models
-    ├── service/
-    │   ├── mod.rs
-    │   ├── ec_service.rs       # Main orchestration
-    │   ├── policy_manager.rs   # Policy configuration
-    │   ├── executor.rs         # Conforma CLI execution
-    │   └── result_parser.rs    # Output parsing
-    └── error.rs                # Error types
+```json
+{
+  "success": false,
+  "filepaths": [
+    {
+      "filepath": "sboms/registry.redhat.io__rhtas__ec-rhel9__sha256__ea49a30eef5a2948b04540666a12048dd082625ce9f755acd3ece085c7d7937e.json",
+      "violations": [
+        {
+          "msg": "There are 2942 packages which is more than the permitted maximum of 510.",
+          "metadata": {
+            "code": "hello_world.minimal_packages",
+            "description": "Just an example... To exclude this rule add \"hello_world.minimal_packages\" to the `exclude` section of the policy configuration.",
+            "solution": "You need to reduce the number of dependencies in this artifact.",
+            "title": "Check we don't have too many packages"
+          }
+        }
+      ],
+      "warnings": [],
+      "successes": [
+        {
+          "msg": "Pass",
+          "metadata": {
+            "code": "hello_world.valid_spdxid",
+            "description": "Make sure that the SPDXID value found in the SBOM matches a list of allowed values.",
+            "title": "Check for valid SPDXID value"
+          }
+        }
+      ],
+      "success": false,
+      "success-count": 1
+    }
+  ],
+  "policy": {
+    "sources": [
+      {
+        "policy": ["github.com/conforma/policy//policy/lib", "./policy"]
+      }
+    ]
+  },
+  "ec-version": "v0.8.83",
+  "effective-time": "2026-03-03T14:36:55.807826709Z"
+}
 ```
 
 ### References
