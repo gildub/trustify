@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772543516191,
+  "lastUpdate": 1772567302937,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14842,6 +14842,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/0f779a8743f2ec797db5d92412c7a6f430381cea"
         },
         "date": 1772543515084,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "d83bec65d74de6e60fbf6f1af1115e399bf2b339",
+          "message": "feat: add btrfs and squashfs tools to the xtask image\n\nThis is required to create a squashfs image or btrfs snapshot, which\nwe then can just mount, instead of running through the whole import\nprocess.",
+          "timestamp": "2026-03-03T12:56:13Z",
+          "tree_id": "98b5df320ece833fd8e7a124ed4384ee1d3fc58c",
+          "url": "https://github.com/gildub/trustify/commit/d83bec65d74de6e60fbf6f1af1115e399bf2b339"
+        },
+        "date": 1772567300912,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
