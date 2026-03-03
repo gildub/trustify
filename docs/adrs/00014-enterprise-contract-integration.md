@@ -102,7 +102,7 @@ C4Context
     UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="1")
 ```
 
-### Component Diagram - EC Validation Module
+### Container Diagram - EC Validation Module
 
 ```mermaid
 C4Container
@@ -150,7 +150,7 @@ C4Container
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
 
-### Container Diagram
+### Component Diagram
 
 ```mermaid
 C4Component
