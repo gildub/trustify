@@ -91,7 +91,7 @@ C4Context
     System_Ext(conforma, "Conforma", "Enterprise Contract policy validation tool")
     System_Ext(policyRepo, "Policy Repository", "Git repository or storage containing EC policies")
 
-    Rel(user, trustify, "Request Compliance<br/>View compliance status", "API/GUI")
+    Rel(user, trustify, "Request compliance<br/>View compliance status", "API/GUI")
     Rel(trustify, conforma, "Executes policy validation", "Spawn Process")
     Rel(conforma, policyRepo, "Fetches policies", "Git/HTTPS")
 
@@ -112,7 +112,7 @@ C4Container
 
 
     Container_Boundary(trustify, "Trustify System") {
-        Container(webui, "Web UI", "React/TypeScript", "Trustify GUI")
+        Container(webui, "Web UI", "Rust/Actix", "Trustify GUI")
         Container(api, "API Gateway", "Actix-web", "REST API endpoints for SBOM <br/> and compliance operations")
         ContainerDb(postgres, "PostgreSQL", "DBMS", "Stores SBOM metadata, relationships, <br/>and EC validation results")
         Container(ecModule, "EC Validation Module", "Rust", "Orchestrates Conforma CLI<br/>execution and result persistence")
@@ -121,6 +121,7 @@ C4Container
     }
 
     Container_Boundary(conforma, "Conforma System") {
+        Container(ecWrapper, "EC Wrapper", "Rust/Actix", "HTTP Wrapper")
         System_Ext(conforma, "Conforma CLI", "External policy validation tool")
     }
 
@@ -128,11 +129,12 @@ C4Container
         System_Ext(policyRepo, "Policy Repository", "Git repository with EC policies")
     }
 
-    Rel(user, webui, "Views compliance status", "HTTPS")
-    Rel(user, api, "Views compliance status", "RESTful")
-    Rel(webui, api, "API calls", "JSON/HTTPS")
+    Rel(user, webui, "Views compliance status", "HTTP API")
+    Rel(user, api, "Views compliance status", "HTTP API")
+    Rel(webui, api, "API calls", "JSON/HTTP API")
     Rel(api, ecModule, "Triggers validation", "Function call")
-    Rel(ecModule, conforma, "Executes validation", "CLI/Process")
+    Rel(ecModule, ecWrapper, "POST /validate {SBOM} {policy}", "HTTP API")
+    Rel(ecWrapper, conforma, "ec validate input {SBOM} {policy}", "Spawned command")
     Rel(ecModule, postgres, "Saves validation<br/>results", "SQL")
     Rel(ecModule, storage, "Stores EC reports", "Function call")
     Rel(storage, s3, "Persists reports", "S3 API")
@@ -141,6 +143,7 @@ C4Container
     UpdateRelStyle(user, webui, $offsetX="-60", $offsetY="30")
     UpdateRelStyle(user, api, $offsetX="-60", $offsetY="-50")
     UpdateRelStyle(webui, api, $offsetX="-40", $offsetY="10")
+    UpdateRelStyle(ecModule, ecWrapper, $offsetX="-50", $offsetY="-20")
     UpdateRelStyle(ecModule, postgres, $offsetX="-40", $offsetY="10")
     UpdateRelStyle(storage, s3, $offsetX="-40", $offsetY="10")
 
@@ -165,7 +168,7 @@ C4Component
     }
     Deployment_Node(external, "External System") {
         Deployment_Node(trustifyPod, "Trustify Pod") {
-            Component(conformaECWrapper, "EC Wrapper", "HTTP API/Webhook")
+            Component(ecWrapper, "EC Wrapper", "Actix-web handlers", "HTTP API/Webhook")
         }
         Deployment_Node(conformaPod, "Conforma Pod") {
             System_Ext(conforma, "Conforma CLI", "Enterprise Contract validation tool")
@@ -183,8 +186,9 @@ C4Component
     Rel(ecEndpoints, ecService, "validate_sbom() / get_ec_report()", "Function call")
     Rel(ecService, policyManager, "get_policy_config()", "Function call")
     Rel(policyManager, postgres, "SELECT ec_policies", "SQL")
-    Rel(ecService, conformaECWrapper, "POST /api/v1/validation", "HTTP")
-    Rel(conformaECWrapper, conforma, "ec validate", "Process spawn")
+    Rel(ecService, ecWrapper, "POST /api/v1/validation", "HTTP + callback URL")
+    Rel(ecWrapper, conforma, "ec validate", "Process spawn")
+    Rel(ecWrapper, ecEndpoints, "POST /validate/job/{id}", "JSON/HTTPS")
     Rel(ecService, resultParser, "parse_output()", "Function call")
     Rel(ecService, resultPersistence, "save_results()", "Function call")
     Rel(resultPersistence, postgres, "INSERT ec_validation_results", "SQL")
@@ -192,6 +196,8 @@ C4Component
 
     UpdateRelStyle(api, ecEndpoints, $offsetX="-50", $offsetY="-50")
     UpdateRelStyle(ecEndpoints, ecService, $offsetX="-60", $offsetY="+40")
+    UpdateRelStyle(ecService, ecWrapper, $offsetX="-20", $offsetY="10")
+    UpdateRelStyle(ecWrapper, ecEndpoints, $offsetX="20", $offsetY="-40")
     UpdateRelStyle(ecService, resultParser, $offsetX="-60", $offsetY="+0")
     UpdateRelStyle(ecService, resultPersistence, $offsetX="-60", $offsetY="+80")
 
