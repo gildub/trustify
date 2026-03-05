@@ -315,7 +315,7 @@ sequenceDiagram
 - `configuration` (JSONB) - Branch, tag, auth credentials, etc.
 - `created_at`, `updated_at` (TIMESTAMP)
 
-**`ec_validation_results`** - one row per validation execution
+**`ec_validation_result`** - one row per validation execution
 
 - `id` (UUID, PK)
 - `validation_id` (VARCHAR, unique) - ID returned by the EC Wrapper, used for callback correlation
