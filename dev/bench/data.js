@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772567302937,
+  "lastUpdate": 1772699237127,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14876,6 +14876,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "bxf12315@gmail.com",
+            "name": "bxf12315@gmail.com",
+            "username": "bxf12315"
+          },
+          "committer": {
+            "email": "00hf11@gmail.com",
+            "name": "Helio Frota",
+            "username": "helio-frota"
+          },
+          "distinct": true,
+          "id": "8f70c6e7c908a50e52a9a713df6a43fab632c6f6",
+          "message": "chore: The dependency reqwest used by trustify-cli is missing several features.",
+          "timestamp": "2026-03-04T11:06:46Z",
+          "tree_id": "8807bb2b409ffcac0e15a8d422e2fccb056d566a",
+          "url": "https://github.com/gildub/trustify/commit/8f70c6e7c908a50e52a9a713df6a43fab632c6f6"
+        },
+        "date": 1772699235156,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 10,
             "unit": "s"
           }
         ]
