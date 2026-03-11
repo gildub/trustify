@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1772699237127,
+  "lastUpdate": 1773221587926,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14905,6 +14905,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 10,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "JimFuller-RedHat",
+            "username": "JimFuller-RedHat"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "15757bf568abf3dea73b73557811b55581e821ba",
+          "message": "supplier: when checking Red Hat supplier - make the check case insensitive",
+          "timestamp": "2026-03-10T13:40:27Z",
+          "tree_id": "5f23458a1959d69db2656daf439151fe6de38e44",
+          "url": "https://github.com/gildub/trustify/commit/15757bf568abf3dea73b73557811b55581e821ba"
+        },
+        "date": 1773221586713,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
             "unit": "s"
           }
         ]
