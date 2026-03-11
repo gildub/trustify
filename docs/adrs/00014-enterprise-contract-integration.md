@@ -34,7 +34,7 @@ An EC Wrapper (HTTP service) acts as a proxy between Trustify's EC service and C
 
 Each SBOM + policy pair has a validation state that follows this lifecycle:
 
-- **Pending** — initial state, set when an SBOM is associated with a policy (e.g., a default policy assigned at SBOM upload time; upload itself is outside the scope of this ADR). Indicates no validation has been triggered yet for this SBOM against this policy.
+- **Pending** — initial state, set when an SBOM is associated with a policy. Indicates no validation has been triggered yet for this SBOM against this policy.
 - **In Progress** — a user has triggered validation; the request is being processed. Other users can see this state, preventing duplicate validation runs for the same SBOM + policy pair.
 - **Pass** — Conforma validation succeeded; the SBOM satisfies the policy.
 - **Fail** — Conforma validation found policy violations; violation details are linked.
@@ -74,10 +74,6 @@ Conforma is not available as WASM and would require major upstream changes.
 
 A Redis/RabbitMQ queue would improve retry handling and priority management; implement if the 429-based rejection approach proves insufficient under real load.
 
-### Future API Migration
-
-When Conforma provides a REST API, the EC Wrapper can be replaced by pointing Trustify's adapter directly at the Conforma REST endpoint. A feature flag (`ec-api-mode`) allows gradual migration. No changes to the service layer, API endpoints, or UI are required.
-
 ## The solution
 
 ### System Architecture
@@ -108,10 +104,7 @@ C4Context
 ```mermaid
 C4Container
     title Enterprise Contract Integration - Container Diagram
-
     Person(user, "Trustify User", "Software engineer or security analyst")
-
-
     Container_Boundary(trustify, "Trustify System") {
         Container(webui, "Web UI", "Rust/Actix", "Trustify GUI")
         Container(api, "API Gateway", "Actix-web", "REST API endpoints for SBOM <br/> and compliance operations")
@@ -130,24 +123,33 @@ C4Container
         System_Ext(policyRepo, "Policy Repository", "Git repository with EC policies")
     }
 
+    Container_Boundary(oidc, "OIDC") {
+        System_Ext(oidc, "OIDC", "OPenID Connect OAuth 2.0
+        ", "")
+    }
+
     Rel(user, webui, "Views compliance status", "HTTP API")
     Rel(user, api, "Views compliance status", "HTTP API")
     Rel(webui, api, "API calls", "JSON/HTTP API")
     Rel(api, ecModule, "Triggers validation", "Function call")
-    Rel(ecModule, ecWrapper, "POST /api/v1/validation {SBOM, policy_ref}<br/>← returns validation_id", "HTTP API")
-    Rel(ecWrapper, api, "POST /api/v2/ec/validation/{validation_id}/result", "HTTP callback")
+    Rel(ecModule, ecWrapper, "POST /validation", "HTTP API formData")
+    Rel(ecWrapper, api, "POST /validation/{id}/result", "HTTP API")
     Rel(ecWrapper, conforma, "ec validate input {SBOM} {policy}", "Spawned command")
     Rel(ecModule, postgres, "Saves validation<br/>results", "SQL")
     Rel(ecModule, storage, "Stores EC reports", "Function call")
     Rel(storage, s3, "Persists reports", "S3 API")
     Rel(conforma, policyRepo, "Fetches policies", "Git/HTTPS")
+    Rel(ecWrapper, oidc, "Authenticate", "OAuth API")
 
     UpdateRelStyle(user, webui, $offsetX="-60", $offsetY="30")
     UpdateRelStyle(user, api, $offsetX="-60", $offsetY="-50")
     UpdateRelStyle(webui, api, $offsetX="-40", $offsetY="10")
     UpdateRelStyle(ecModule, ecWrapper, $offsetX="-50", $offsetY="-20")
+    UpdateRelStyle(ecWrapper, api, $offsetX="-60", $offsetY="-10")
     UpdateRelStyle(ecModule, postgres, $offsetX="-40", $offsetY="10")
     UpdateRelStyle(storage, s3, $offsetX="-40", $offsetY="10")
+    UpdateRelStyle(conforma, policyRepo, $offsetX="-40", $offsetY="100")
+    UpdateRelStyle(ecWrapper, oidc, $offsetX="30", $offsetY="40")
 
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
@@ -180,7 +182,7 @@ C4Component
     Container_Boundary(dbms, "Database") {
         ContainerDb(postgres, "PostgreSQL", "Database", "Stores validation results and policy references")
     }
-        Container_Boundary(storage, "S3 System") {
+    Container_Boundary(storage, "S3 System") {
         System_Ext(s3, "S3 Object Storage", "Stores SBOM documents and reports")
     }
 
@@ -188,7 +190,7 @@ C4Component
     Rel(ecEndpoints, ecService, "validate_sbom() / get_ec_report()", "Function call")
     Rel(ecService, policyManager, "get_policy_config()", "Function call")
     Rel(policyManager, postgres, "SELECT ec_policies", "SQL")
-    Rel(ecService, ecWrapper, "POST /api/v1/validation → returns validation_id", "HTTP")
+    Rel(ecService, ecWrapper, "POST /api/v1/validation → returns {id}", "HTTP")
     Rel(ecWrapper, conforma, "ec validate", "Process spawn")
     Rel(ecWrapper, api, "POST /api/v2/ec/validation/{validation_id}/result", "JSON/HTTPS")
     Rel(ecService, resultParser, "parse_output()", "Function call")
@@ -220,7 +222,7 @@ sequenceDiagram
     participant S3 as Object Storage
     participant Wrapper as EC Wrapper (HTTP)
 
-    User->>API: POST /api/v2/sbom/{sbom_id}/ec-validate {policy_id}
+    User->>API: POST /api/v2/sbom/{sbom_id}/ec-validate/{policy_id}
     API->>EP: dispatch request
     EP->>VS: validate_sbom(sbom_id, policy_id)
 
@@ -318,36 +320,46 @@ sequenceDiagram
 **`ec_validation_result`** - one row per validation execution
 
 - `id` (UUID, PK)
-- `validation_id` (VARCHAR, unique) - ID returned by the EC Wrapper, used for callback correlation
 - `sbom_id` (UUID, FK → sbom)
 - `policy_id` (UUID, FK → ec_policies)
-- `status` (VARCHAR) - 'pending', 'in_progress', 'pass', 'fail', 'error'
+- `status` (ENUM) - 'pending', 'in_progress', 'pass', 'fail', 'error'
 - `violations` (JSONB) - Structured violation data for querying
 - `summary` (JSONB) - Total checks, passed, failed, warnings
 - `report_url` (VARCHAR) - S3 URL to detailed report
-- `executed_at` (TIMESTAMP)
-- `execution_duration_ms` (INTEGER)
+- `start_time` (TIMESTAMP)
+- `end_time` (TIMESTAMP)
 - `conforma_version` (VARCHAR) - Conforma CLI version used (e.g., `v0.8.83`), for reproducibility
 - `policy_version` (VARCHAR) - Policy commit hash or tag resolved at validation time
 - `error_message` (TEXT) - Populated only on error status
 
-### API Endpoints
+### Trustify API Endpoints
 
 ```
-POST   /api/v2/sboms/{id}/ec-validate                      # Trigger validation
+POST   /api/v2/sboms/{id}/ec-validate                     # Trigger validation
 GET    /api/v2/sboms/{id}/ec-report                       # Get latest validation result
 GET    /api/v2/sboms/{id}/ec-report/history               # Get validation history
 GET    /api/v2/ec/report/{result_id}                      # Download detailed report from S3
 POST   /api/v2/ec/validation/{validation_id}/result       # Callback: EC Wrapper posts Conforma result
 
-POST   /api/v2/ec/policies                    # Create policy reference (admin)
-GET    /api/v2/ec/policies                    # List policy references
-GET    /api/v2/ec/policies/{id}               # Get policy reference
-PUT    /api/v2/ec/policies/{id}               # Update policy reference (admin)
-DELETE /api/v2/ec/policies/{id}               # Delete policy reference (admin)
+POST   /api/v2/ec/policy                    # Create policy reference (admin)
+GET    /api/v2/ec/policy                    # List policy references
+GET    /api/v2/ec/policy/{id}               # Get policy reference
+PUT    /api/v2/ec/policy/{id}               # Update policy reference (admin)
+DELETE /api/v2/ec/policy/{id}               # Delete policy reference (admin)
 ```
 
-### Module Structure
+## Conforma HTTP Wrapper API Endpoints
+
+### POST `/api/v1/validate`
+
+Validate the uploaded SBOM file against the provided rule URL.
+
+#### Response
+
+- 200 - if the validation request was accepted
+- 401 - if the user was not authenticated
+
+### Trustify Module Structure
 
 ```
 modules/ec/
@@ -366,6 +378,17 @@ modules/ec/
     │   ├── policy_manager.rs   # Policy configuration
     │   ├── executor.rs         # EC Wrapper HTTP client (adapter)
     │   └── result_parser.rs    # Output parsing
+    └── error.rs                # Error types
+```
+
+### HTTP Wrapper Module Structure
+
+```
+├── Cargo.toml
+└── server
+    ├── lib.rs
+    ├── endpoints/
+    │   └── mod.rs              # REST endpoints
     └── error.rs                # Error types
 ```
 
