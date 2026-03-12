@@ -351,14 +351,9 @@ DELETE /api/v2/ec/policy/{id}               # Delete policy reference (admin)
 
 ## Conforma HTTP Wrapper API Endpoints
 
-### POST `/api/v1/validate`
-
-Validate the uploaded SBOM file against the provided rule URL.
-
-#### Response
-
-- 200 - if the validation request was accepted
-- 401 - if the user was not authenticated
+```
+POST   /api/v1/validate                       # Validate uploaded SBOM file against the provided Policy URL
+```
 
 ### Trustify Module Structure
 
@@ -395,7 +390,7 @@ modules/ec/
 
 ### Technical Considerations
 
-#### Conforma CLI Execution (HTTP Wrapper)
+#### Conforma CLI Execution (HTTPEC Wrapper)
 
 The HTTP Wrapper invokes Conforma via process spawning (e.g., `tokio::process::Command`). All arguments are passed as an array — never as a shell string — to prevent CLI injection. Execution has a configurable timeout (default 5 minutes); large SBOMs are written to a temp file and passed by path rather than piped via stdin, which avoids OOM issues.
 
