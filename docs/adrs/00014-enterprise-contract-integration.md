@@ -395,9 +395,9 @@ modules/ec/
 
 ### Technical Considerations
 
-#### Conforma CLI Execution (EC Wrapper)
+#### Conforma CLI Execution (HTTP Wrapper)
 
-The EC Wrapper invokes Conforma via process spawning (e.g., `tokio::process::Command`). All arguments are passed as an array — never as a shell string — to prevent CLI injection. Execution has a configurable timeout (default 5 minutes); large SBOMs are written to a temp file and passed by path rather than piped via stdin, which avoids OOM issues.
+The HTTP Wrapper invokes Conforma via process spawning (e.g., `tokio::process::Command`). All arguments are passed as an array — never as a shell string — to prevent CLI injection. Execution has a configurable timeout (default 5 minutes); large SBOMs are written to a temp file and passed by path rather than piped via stdin, which avoids OOM issues.
 
 Exit codes are treated as follows: 0 = pass, 1 = policy violations (expected failure, not an error), 2+ = execution error. It is important to distinguish 1 from 2+ in error handling — a policy violation is a valid result that should be surfaced to the user, not treated as a system failure.
 
