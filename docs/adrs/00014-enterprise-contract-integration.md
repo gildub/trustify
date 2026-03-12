@@ -330,7 +330,6 @@ sequenceDiagram
 - `report_path` (VARCHAR) - File system or S3 path to detailed report
 - `start_time` (TIMESTAMP)
 - `end_time` (TIMESTAMP)
-- `conforma_version` (VARCHAR) - Conforma CLI version used (e.g., `v0.8.83`), for reproducibility
 - `policy_version` (VARCHAR) - Policy commit hash or tag resolved at validation time
 - `error_message` (TEXT) - Populated only on error status
 
@@ -410,9 +409,9 @@ On the EC Wrapper side, concurrent Conforma processes are bounded by a semaphore
 
 #### Policy Management
 
-ec_policies stores external references only. Conforma fetches the actual policy at validation time, which means Trustify does not cache policy content by default. The trade-off: validation always uses the latest policy version, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the configuration JSONB column and must be encrypted at rest; they are never logged.
+ec_policies stores external references only. Conforma fetches the actual policy at validation time, which means Trustify does not cache policy content by default. The trade-off: validation always uses the latest policy version, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the configuration JSONB column and will be encrypted using AES crate; they are never logged.
 
-The Conforma CLI version and the policy commit hash/tag resolved at validation time are recorded in each result row (`conforma_version` and `policy_version` respectively), enabling reproducibility and audit.
+The policy commit hash/tag (`policy_version`) resolved at validation time are recorded in each result row, enabling reproducibility and audit.
 
 #### Multi-tenancy
 
