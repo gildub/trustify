@@ -28,6 +28,8 @@ Users need the ability to:
 We will integrate Conforma into Trustify as a user triggered validation service by interacting with Conforma CLI.  
 Validation is manually triggered — not automatic on SBOM upload.  
 Validation on upload is deferred to a follow-up version.
+Trustify stores information to identify (id, name, URL) of Policies.
+A defaut Policy is defined at the application level which will be the Policy used for validation if a SBOM doesn't have a Policy attached to it.
 
 Conforma CLI is deployed separately from Trustify as either a standalone container or equivalent.
 An EC Wrapper (HTTP service) acts as a proxy between Trustify's EC service and Conforma CLI.
