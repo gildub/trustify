@@ -34,7 +34,7 @@ An EC Wrapper (HTTP service) acts as a proxy between Trustify's EC service and C
 
 Each SBOM + policy pair has a validation state that follows this lifecycle:
 
-- **Pending** — initial state, set when an SBOM is associated with a policy. Indicates no validation has been triggered yet for this SBOM against this policy.
+- **Pending** — initial state, indicates no validation has been triggered yet for this SBOM against this policy.
 - **In Progress** — a user has triggered validation; the request is being processed. Other users can see this state, preventing duplicate validation runs for the same SBOM + policy pair.
 - **Pass** — Conforma validation succeeded; the SBOM satisfies the policy.
 - **Fail** — Conforma validation found policy violations; violation details are linked.
@@ -45,10 +45,10 @@ The "In Progress" state serves as a concurrency guard: if a validation is alread
 What is stored where
 
 - PostgreSQL: validation status, structured violations (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, status, executed_at.
-- S3/Minio: full raw Conforma JSON report, linked from the DB row via report_url. Keeps DB rows small while preserving audit completeness.
+- Storage system: full raw Conforma JSON report, linked from the DB row via report_path. Keeps DB rows small while preserving audit completeness.
 - Not stored: the policy definitions themselves. ec_policies stores references (URLs, OCI refs) that Conforma fetches at runtime.
 
-Storing full JSON in S3 rather than only a summary was chosen explicitly to preserve audit completeness — callers can always fetch the raw report. The DB violations JSONB holds enough structure for filtering and dashboards without duplicating the full payload.
+Storing full JSON in storage system rather than only a summary was chosen explicitly to preserve audit completeness — callers can always fetch the raw report. The DB violations JSONB holds enough structure for filtering and dashboards without duplicating the full payload.
 
 ## Consequences
 
@@ -294,11 +294,11 @@ sequenceDiagram
     alt Pass
         VS->>DB: UPDATE ec_validation_results SET status='pass', violations=[]
         VS->>S3: store_validation_report(result_id, full_json)
-        VS->>DB: UPDATE SET report_url = ?
+        VS->>DB: UPDATE SET ureport_path = ?
     else Fail
         VS->>DB: UPDATE ec_validation_results SET status='fail', violations=json
         VS->>S3: store_validation_report(result_id, full_json)
-        VS->>DB: UPDATE SET report_url = ?
+        VS->>DB: UPDATE SET report_part = ?
     else Error
         VS->>DB: UPDATE ec_validation_results SET status='error', error_message=detail
         Note over VS,DB: Validation can be re-triggered (new request will create a new row with status='in_progress')
@@ -325,7 +325,7 @@ sequenceDiagram
 - `status` (ENUM) - 'pending', 'in_progress', 'pass', 'fail', 'error'
 - `violations` (JSONB) - Structured violation data for querying
 - `summary` (JSONB) - Total checks, passed, failed, warnings
-- `report_url` (VARCHAR) - S3 URL to detailed report
+- `report_path` (VARCHAR) - File system or S3 path to detailed report
 - `start_time` (TIMESTAMP)
 - `end_time` (TIMESTAMP)
 - `conforma_version` (VARCHAR) - Conforma CLI version used (e.g., `v0.8.83`), for reproducibility
