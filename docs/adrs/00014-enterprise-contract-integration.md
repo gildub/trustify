@@ -322,10 +322,40 @@ sequenceDiagram
 - `id` (UUID, PK)
 - `name` (VARCHAR, unique) - User-friendly name label
 - `description` (TEXT) - What this policy enforces
-- `policy_ref` (VARCHAR) - Git URL, OCI registry, or file path
-- `policy_type` (VARCHAR) - 'git', 'oci', 'local'
-- `configuration` (JSONB) - Branch, tag, auth credentials, etc.
+- `policy_type` (VARCHAR) - 'Git URL'
+- `configuration` (JSONB) - See model below
 - `created_at`, `updated_at` (TIMESTAMP)
+
+**`ec_policy.configuration` JSONB model:**
+
+| Field                  | Type     | Required        | Description                                                                      |
+| ---------------------- | -------- | --------------- | -------------------------------------------------------------------------------- |
+| `policy_ref`           | string   | yes             | Policy source URL, e.g. `"git://github.com/org/policy-repo?ref=main"`            |
+| `auth`                 | object   | no              | Credentials for private repos; sensitive values encrypted via AES (never logged) |
+| `auth.type`            | string   | yes (if `auth`) | `"token"`, `"ssh_key"`, or `"none"`                                              |
+| `auth.token_encrypted` | string   | no              | AES-encrypted bearer/PAT token, prefixed with encryption scheme                  |
+| `policy_paths`         | string[] | no              | Sub-paths within the repo to evaluate (maps to Conforma `--policy` source paths) |
+| `exclude`              | string[] | no              | Rule codes to skip during validation                                             |
+| `include`              | string[] | no              | If non-empty, only these rule codes are evaluated                                |
+| `timeout_seconds`      | integer  | no              | Per-policy override of the default 5-minute execution timeout                    |
+| `extra_args`           | string[] | no              | Additional CLI flags forwarded verbatim to Conforma                              |
+
+Example of configuration field :
+
+```json
+{
+  "policy_ref": "git://github.com/org/policy-repo?ref=main",
+  "auth": {
+    "type": "token",
+    "token_encrypted": "AES256:<base64-ciphertext>"
+  },
+  "policy_paths": ["policy/lib", "policy/release"],
+  "exclude": ["hello_world.minimal_packages"],
+  "include": [],
+  "timeout_seconds": 300,
+  "extra_args": ["--strict"]
+}
+```
 
 **`ec_validation_result`** - one row per validation execution
 
@@ -334,13 +364,45 @@ sequenceDiagram
 - `policy_id` (UUID, FK → ec_policy)
 - `ec_status` (ENUM) - 'queued', 'in_progress', 'completed', 'failed'
 - `status` (ENUM) - 'pending', 'pass', 'fail', 'error'
-- `violations` (JSONB) - Structured violation data for querying
+- `violations` (JSONB) - See model below
 - `summary` (JSONB) - Total checks, passed, failed, warnings
 - `report_path` (VARCHAR) - File system or S3 path to detailed report
 - `start_time` (TIMESTAMP)
 - `end_time` (TIMESTAMP)
 - `policy_version` (VARCHAR) - Policy commit hash or tag resolved at validation time
 - `error_message` (TEXT) - Populated only on error status
+
+**`ec_validation_result.violations` JSONB model:**
+
+```json
+[
+  {
+    "severity": "violation",
+    "msg": "There are 2942 packages which is more than the permitted maximum of 510.",
+    "code": "hello_world.minimal_packages",
+    "title": "Check we don't have too many packages",
+    "description": "Just an example... To exclude this rule add \"hello_world.minimal_packages\" to the `exclude` section of the policy configuration.",
+    "solution": "You need to reduce the number of dependencies in this artifact."
+  },
+  {
+    "severity": "warning",
+    "msg": "Deprecated license format detected.",
+    "code": "license.format_check",
+    "title": "License format validation",
+    "description": "Checks that license identifiers follow the SPDX specification.",
+    "solution": "Update license identifiers to valid SPDX expressions."
+  }
+]
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `severity` | string | yes | `"violation"` or `"warning"` (derived from Conforma's `violations` vs `warnings` arrays) |
+| `msg` | string | yes | Human-readable message describing the finding |
+| `code` | string | yes | Rule identifier (e.g. `"hello_world.minimal_packages"`), useful for filtering and deduplication |
+| `title` | string | yes | Short rule title |
+| `description` | string | no | Longer explanation of what the rule checks |
+| `solution` | string | no | Suggested remediation |
 
 ### Trustify API Endpoints
 
