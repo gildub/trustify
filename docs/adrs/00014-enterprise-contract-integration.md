@@ -340,7 +340,7 @@ sequenceDiagram
 | `timeout_seconds`      | integer  | no              | Per-policy override of the default 5-minute execution timeout                    |
 | `extra_args`           | string[] | no              | Additional CLI flags forwarded verbatim to Conforma                              |
 
-Example of configuration field :
+`ec_policy.configuration` example :
 
 ```json
 {
@@ -364,7 +364,7 @@ Example of configuration field :
 - `policy_id` (UUID, FK → ec_policy)
 - `ec_status` (ENUM) - 'queued', 'in_progress', 'completed', 'failed'
 - `status` (ENUM) - 'pending', 'pass', 'fail', 'error'
-- `violations` (JSONB) - See model below
+- `results` (JSONB) - See model below
 - `summary` (JSONB) - Total checks, passed, failed, warnings
 - `report_path` (VARCHAR) - File system or S3 path to detailed report
 - `start_time` (TIMESTAMP)
@@ -372,37 +372,53 @@ Example of configuration field :
 - `policy_version` (VARCHAR) - Policy commit hash or tag resolved at validation time
 - `error_message` (TEXT) - Populated only on error status
 
-**`ec_validation_result.violations` JSONB model:**
+**`ec_validation_result.results` JSONB model:**
+
+| Field                  | Type   | Required | Description                                                                                                       |
+| ---------------------- | ------ | -------- | ----------------------------------------------------------------------------------------------------------------- |
+| `severity`             | string | yes      | `"violation"`, `"warning"`, or `"success"` (derived from Conforma's `violations`, `warnings`, `successes` arrays) |
+| `msg`                  | string | yes      | Human-readable message describing the check outcome                                                               |
+| `metadata`             | object | yes      | Rule metadata, preserved as-is from Conforma CLI output                                                           |
+| `metadata.code`        | string | yes      | Rule identifier (e.g. `"hello_world.minimal_packages"`), useful for filtering and deduplication                   |
+| `metadata.title`       | string | yes      | Short rule title                                                                                                  |
+| `metadata.description` | string | no       | Longer explanation of what the rule checks                                                                        |
+| `metadata.solution`    | string | no       | Suggested remediation (typically absent for successes)                                                            |
+
+`ec_validation_result.results` example:
 
 ```json
 [
   {
     "severity": "violation",
     "msg": "There are 2942 packages which is more than the permitted maximum of 510.",
-    "code": "hello_world.minimal_packages",
-    "title": "Check we don't have too many packages",
-    "description": "Just an example... To exclude this rule add \"hello_world.minimal_packages\" to the `exclude` section of the policy configuration.",
-    "solution": "You need to reduce the number of dependencies in this artifact."
+    "metadata": {
+      "code": "hello_world.minimal_packages",
+      "title": "Check we don't have too many packages",
+      "description": "Just an example... To exclude this rule add \"hello_world.minimal_packages\" to the `exclude` section of the policy configuration.",
+      "solution": "You need to reduce the number of dependencies in this artifact."
+    }
   },
   {
     "severity": "warning",
     "msg": "Deprecated license format detected.",
-    "code": "license.format_check",
-    "title": "License format validation",
-    "description": "Checks that license identifiers follow the SPDX specification.",
-    "solution": "Update license identifiers to valid SPDX expressions."
+    "metadata": {
+      "code": "license.format_check",
+      "title": "License format validation",
+      "description": "Checks that license identifiers follow the SPDX specification.",
+      "solution": "Update license identifiers to valid SPDX expressions."
+    }
+  },
+  {
+    "severity": "success",
+    "msg": "Pass",
+    "metadata": {
+      "code": "hello_world.valid_spdxid",
+      "title": "Check for valid SPDXID value",
+      "description": "Make sure that the SPDXID value found in the SBOM matches a list of allowed values."
+    }
   }
 ]
 ```
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `severity` | string | yes | `"violation"` or `"warning"` (derived from Conforma's `violations` vs `warnings` arrays) |
-| `msg` | string | yes | Human-readable message describing the finding |
-| `code` | string | yes | Rule identifier (e.g. `"hello_world.minimal_packages"`), useful for filtering and deduplication |
-| `title` | string | yes | Short rule title |
-| `description` | string | no | Longer explanation of what the rule checks |
-| `solution` | string | no | Suggested remediation |
 
 ### Trustify API Endpoints
 
@@ -483,52 +499,6 @@ The policy commit hash/tag (`policy_version`) resolved at validation time are re
 #### Multi-tenancy
 
 Policy references are global (shared across all users) in this initial implementation. Per-organization policy namespacing is out of scope here and should be addressed in a dedicated multi-tenancy ADR when Trustify adds org-level isolation more broadly.
-
-### Structure of JSON returned from Conforma CLI validation request (from an example)
-
-```json
-{
-  "success": false,
-  "filepaths": [
-    {
-      "filepath": "sboms/registry.redhat.io__rhtas__ec-rhel9__sha256__ea49a30eef5a2948b04540666a12048dd082625ce9f755acd3ece085c7d7937e.json",
-      "violations": [
-        {
-          "msg": "There are 2942 packages which is more than the permitted maximum of 510.",
-          "metadata": {
-            "code": "hello_world.minimal_packages",
-            "description": "Just an example... To exclude this rule add \"hello_world.minimal_packages\" to the `exclude` section of the policy configuration.",
-            "solution": "You need to reduce the number of dependencies in this artifact.",
-            "title": "Check we don't have too many packages"
-          }
-        }
-      ],
-      "warnings": [],
-      "successes": [
-        {
-          "msg": "Pass",
-          "metadata": {
-            "code": "hello_world.valid_spdxid",
-            "description": "Make sure that the SPDXID value found in the SBOM matches a list of allowed values.",
-            "title": "Check for valid SPDXID value"
-          }
-        }
-      ],
-      "success": false,
-      "success-count": 1
-    }
-  ],
-  "policy": {
-    "sources": [
-      {
-        "policy": ["github.com/conforma/policy//policy/lib", "./policy"]
-      }
-    ]
-  },
-  "ec-version": "v0.8.83",
-  "effective-time": "2026-03-03T14:36:55.807826709Z"
-}
-```
 
 ### References
 
