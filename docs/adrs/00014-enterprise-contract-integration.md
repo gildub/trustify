@@ -367,22 +367,19 @@ sequenceDiagram
 - `results` (JSONB) - See model below
 - `summary` (JSONB) - Total checks, passed, failed, warnings
 - `report_path` (VARCHAR) - File system or S3 path to detailed report
-- `start_time` (TIMESTAMP)
-- `end_time` (TIMESTAMP)
-- `policy_version` (VARCHAR) - Policy commit hash or tag resolved at validation time
 - `error_message` (TEXT) - Populated only on error status
 
 **`ec_validation_result.results` JSONB model:**
 
-| Field                  | Type   | Required | Description                                                                                                       |
-| ---------------------- | ------ | -------- | ----------------------------------------------------------------------------------------------------------------- |
-| `severity`             | string | yes      | `"violation"`, `"warning"`, or `"success"` (derived from Conforma's `violations`, `warnings`, `successes` arrays) |
-| `msg`                  | string | yes      | Human-readable message describing the check outcome                                                               |
-| `metadata`             | object | yes      | Rule metadata, preserved as-is from Conforma CLI output                                                           |
-| `metadata.code`        | string | yes      | Rule identifier (e.g. `"hello_world.minimal_packages"`), useful for filtering and deduplication                   |
-| `metadata.title`       | string | yes      | Short rule title                                                                                                  |
-| `metadata.description` | string | no       | Longer explanation of what the rule checks                                                                        |
-| `metadata.solution`    | string | no       | Suggested remediation (typically absent for successes)                                                            |
+| Field                  | Type   | Required | Description                                             |
+| ---------------------- | ------ | -------- | ------------------------------------------------------- |
+| `severity`             | string | yes      | `"violation"`, `"warning"`, or `"success"`              |
+| `msg`                  | string | yes      | Human-readable message describing the check outcome     |
+| `metadata`             | object | yes      | Rule metadata, preserved as-is from Conforma CLI output |
+| `metadata.code`        | string | yes      | Rule identifier for filtering and deduplication         |
+| `metadata.title`       | string | yes      | Short rule title                                        |
+| `metadata.description` | string | no       | Detailed explanation of what the rule checks            |
+| `metadata.solution`    | string | no       | Suggested remediation (absent for successes)            |
 
 `ec_validation_result.results` example:
 
@@ -418,6 +415,32 @@ sequenceDiagram
     }
   }
 ]
+```
+
+**`ec_validation_result.summary` JSONB model:**
+
+| Field            | Type    | Required | Description                                                              |
+| ---------------- | ------- | -------- | ------------------------------------------------------------------------ |
+| `success`        | boolean | yes      | Overall pass/fail outcome (mirrors Conforma's top-level `success` field) |
+| `total`          | integer | yes      | Total number of checks evaluated                                         |
+| `violations`     | integer | yes      | Count of checks with violation severity                                  |
+| `warnings`       | integer | yes      | Count of checks with warning severity                                    |
+| `successes`      | integer | yes      | Count of checks that passed                                              |
+| `ec_version`     | string  | yes      | Conforma version used (e.g. `"v0.8.83"`)                                 |
+| `effective_time` | string  | yes      | ISO 8601 timestamp of evaluation from Conforma                           |
+
+`ec_validation_result.summary` example:
+
+```json
+{
+  "success": false,
+  "total": 3,
+  "violations": 1,
+  "warnings": 1,
+  "successes": 1,
+  "ec_version": "v0.8.83",
+  "effective_time": "2026-03-03T14:36:55.807826709Z"
+}
 ```
 
 ### Trustify API Endpoints
