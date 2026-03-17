@@ -30,7 +30,6 @@ Validation is manually triggered — not automatic on SBOM upload.
 Validation on upload is deferred to a follow-up version.
 Trustify stores information to identify (id, name, URL) of Policies.
 A default Policy is defined at the application level (global policy) which is used for validation when an SBOM does not have any Policy explicitly attached to it.
-An SBOM can also carry references to one or more Policies. This one-to-many relationship between SBOM and Policy is modeled through a join table (`sbom_ec_policy`).
 
 Conforma CLI is deployed separately from Trustify as either a standalone container or equivalent.
 An EC Wrapper (HTTP service) acts as a proxy between Trustify's EC service and Conforma CLI.
@@ -328,12 +327,6 @@ sequenceDiagram
 - `configuration` (JSONB) - Branch, tag, auth credentials, etc.
 - `created_at`, `updated_at` (TIMESTAMP)
 
-**`sbom_ec_policy`** - Join table linking SBOMs to their attached policies (one SBOM → many policies)
-
-- `sbom_id` (UUID, FK → sbom, PK)
-- `policy_id` (UUID, FK → ec_policy, PK)
-- `created_at` (TIMESTAMP)
-
 **`ec_validation_result`** - one row per validation execution
 
 - `id` (UUID, PK)
@@ -352,24 +345,24 @@ sequenceDiagram
 ### Trustify API Endpoints
 
 ```
-POST   /api/v2/sbom/{id}/ec-validate                     # Trigger validation
-GET    /api/v2/sbom/{id}/ec-report                       # Get latest validation result
-GET    /api/v2/sbom/{id}/ec-report/history               # Get validation history
-
-GET    /api/v2/ec/report/{result_id}                      # Download detailed report from S3
-POST   /api/v2/ec/validation/{validation_id}/result       # Callback: EC Wrapper posts Conforma result
-
 POST   /api/v2/ec/policy                    # Create policy reference (admin)
 GET    /api/v2/ec/policy                    # List policy references
 GET    /api/v2/ec/policy/{id}               # Get policy reference
 PUT    /api/v2/ec/policy/{id}               # Update policy reference (admin)
 DELETE /api/v2/ec/policy/{id}               # Delete policy reference (admin)
+
+POST   /api/v2/ec/validate?sbom_id={id}&policy_id={id}        # Trigger validation
+GET    /api/v2/ec/report?sbom_id={id}&policy_id={id}          # Get latest validation result
+GET    /api/v2/ec/report/history?sbom_id={id}&policy_id={id}  # Get validation history
+GET    /api/v2/ec/report/{result_id}                          # Download detailed report from S3
+
+POST   /api/v2/ec/validation/{validation_id}/result       # Callback: EC Wrapper posts Conforma result
 ```
 
-## Conforma HTTP Wrapper API Endpoints
+## Conforma EC Wrapper API Endpoints
 
 ```
-POST   /api/v1/validate                       # Validate uploaded SBOM file against the provided Policy URL
+POST   /api/v1/validate                     # Validate uploaded SBOM file against the provided Policy URL (multipart form)
 ```
 
 ### Trustify Module Structure
