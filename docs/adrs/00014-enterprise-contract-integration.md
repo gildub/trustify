@@ -62,7 +62,21 @@ Storing full JSON in storage system rather than only a summary was chosen explic
 
 ## Consequences
 
-Using an EC Wrapper decouples the validation process into an external service. This better caters for large-scale deployments as EC validation has its own resource constraints. Meanwhile it adds infrastructure complexity as the EC Wrapper must be deployed and maintained alongside the Conforma CLI.
+### Why EC runs externally
+
+EC validation can be be very resource-intensive (especially for large SBOMs with thousands of packages) and it should not compete with Trustify.
+A dedicated EC Wrapper running alonside EC instance (Conforma CLI, etc) provides :
+
+- **Resource isolation** — A long-running or memory-heavy Conforma process cannot degrade Trustify's responsiveness.
+- **Independent scaling** — The EC Wrapper can be scaled horizontally (more replicas) based on validation demand without scaling the entire Trustify deployment. Conversely, Trustify can scale for query load without provisioning excess capacity for validation.
+- **Failure containment** — An EC instance crash (OOM kill, policy fetch timeout, unexpected CLI error) is isolated to the wrapper. Trustify records the failure in `ec_status` and remains fully operational; the validation can be re-triggered.
+- **Version independence** — The EC Wrapper and EC instance (Conforma CLI) can be upgraded or rolled back on their own release cadence, without redeploying Trustify. This is important given Conforma's active development pace.
+
+The trade-off is added infrastructure complexity: the EC Wrapper must be deployed separatly with EC instance, monitored, and maintained as a separate component alongside the Conforma CLI binary.
+
+In Kubernetes or standalone machine deployments, the EC Wrapper pod has its own resource requests/limits, independent of the Trustify pod.
+
+### CLI spawning
 
 Within the EC Wrapper, Conforma is invoked via CLI spawning rather than a native API. This introduces an operational dependency (Conforma must be installed and version-pinned on every EC Wrapper instance) and per-validation process spawning overhead. These are accepted trade-offs given that no Conforma REST API exists yet. On the Trustify side, the EC service interacts with the EC Wrapper over HTTP and is built behind an adapter interface, so the implementation can be swapped for a direct Conforma REST client when one becomes available, without changes to the service layer or API.
 
