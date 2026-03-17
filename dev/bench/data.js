@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773752505239,
+  "lastUpdate": 1773775778974,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14992,6 +14992,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 10,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "86094767+mrrajan@users.noreply.github.com",
+            "name": "mrrajan",
+            "username": "mrrajan"
+          },
+          "committer": {
+            "email": "86094767+mrrajan@users.noreply.github.com",
+            "name": "Rajan Ravi",
+            "username": "mrrajan"
+          },
+          "distinct": true,
+          "id": "43685c7578e2f053797cbc6ea96e9e3875dd69d4",
+          "message": "Extract license_text_coalesce helper\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>",
+          "timestamp": "2026-03-17T15:15:37Z",
+          "tree_id": "81d62f0f4756dfeb0380de266d72cd87837d2566",
+          "url": "https://github.com/gildub/trustify/commit/43685c7578e2f053797cbc6ea96e9e3875dd69d4"
+        },
+        "date": 1773775777696,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
             "unit": "s"
           }
         ]
