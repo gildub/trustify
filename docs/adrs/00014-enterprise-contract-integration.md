@@ -54,11 +54,11 @@ The `ec_status` "In Progress" state serves as a concurrency guard: if a validati
 
 What is stored where
 
-- PostgreSQL: validation process state (`ec_status`), validation outcome (`status`), structured violations (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, ec_status, status, start_time.
+- PostgreSQL: validation process state (`ec_status`), validation outcome (`status`), structured results (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, ec_status, status, start_time.
 - Storage system: full raw Conforma JSON report, linked from the DB row via report_path. Keeps DB rows small while preserving audit completeness.
 - Not stored: the policy definitions themselves. ec_policy stores references (URLs, OCI refs) that Conforma fetches at runtime.
 
-Storing full JSON in storage system rather than only a summary was chosen explicitly to preserve audit completeness — callers can always fetch the raw report. The DB violations JSONB holds enough structure for filtering and dashboards without duplicating the full payload.
+Storing full JSON in storage system rather than only a summary was chosen explicitly to preserve audit completeness — callers can always fetch the raw report. The DB results JSONB holds enough structure for filtering and dashboards without duplicating the full payload.
 
 ## Consequences
 
@@ -196,7 +196,7 @@ C4Component
         System_Ext(s3, "S3 Object Storage", "Stores SBOM documents and reports")
     }
 
-    Rel(api, ecEndpoints, "POST /sboms/{id}/ec-validate,\nGET /sboms/{id}/ec-report", "JSON/HTTPS")
+    Rel(api, ecEndpoints, "POST /ec/validate,\nGET /ec/report", "JSON/HTTPS")
     Rel(ecEndpoints, ecService, "validate_sbom() / get_ec_report()", "Function call")
     Rel(ecService, policyManager, "get_policy_config()", "Function call")
     Rel(policyManager, postgres, "SELECT ec_policy", "SQL")
@@ -232,7 +232,7 @@ sequenceDiagram
     participant S3 as Object Storage
     participant Wrapper as EC Wrapper (HTTP)
 
-    User->>API: POST /api/v2/sbom/{sbom_id}/ec-validate/{policy_id}
+    User->>API: POST /api/v2/ec/validate (multipart form: sbom_id, policy_id)
     API->>EP: dispatch request
     EP->>VS: validate_sbom(sbom_id, policy_id)
 
@@ -261,7 +261,7 @@ sequenceDiagram
     VS->>S3: retrieve_sbom_document(sbom_id)
     S3-->>VS: SBOM document (JSON/XML)
 
-    VS->>Wrapper: POST /api/v1/validation {SBOM, policy_ref}
+    VS->>Wrapper: POST /api/v1/validate {SBOM, policy_ref}
     Wrapper-->>VS: 202 Accepted {validation_id}
 
     VS->>DB: INSERT ec_validation_result (ec_status='in_progress', status='pending', sbom_id, policy_id, validation_id, ...)
@@ -302,11 +302,11 @@ sequenceDiagram
     EP->>VS: process_validation_result(validation_id, result)
 
     alt Pass
-        VS->>DB: UPDATE ec_validation_result SET ec_status='completed', status='pass', violations=[]
+        VS->>DB: UPDATE ec_validation_result SET ec_status='completed', status='pass', results=[]
         VS->>S3: store_validation_report(result_id, full_json)
         VS->>DB: UPDATE SET report_path = ?
     else Fail
-        VS->>DB: UPDATE ec_validation_result SET ec_status='completed', status='fail', violations=json
+        VS->>DB: UPDATE ec_validation_result SET ec_status='completed', status='fail', results=json
         VS->>S3: store_validation_report(result_id, full_json)
         VS->>DB: UPDATE SET report_path = ?
     else Error
@@ -367,6 +367,9 @@ sequenceDiagram
 - `results` (JSONB) - See model below
 - `summary` (JSONB) - Total checks, passed, failed, warnings
 - `report_path` (VARCHAR) - File system or S3 path to detailed report
+- `start_time` (TIMESTAMP)
+- `end_time` (TIMESTAMP)
+- `policy_version` (VARCHAR) - Policy commit hash or tag resolved at validation time
 - `error_message` (TEXT) - Populated only on error status
 
 **`ec_validation_result.results` JSONB model:**
@@ -452,7 +455,7 @@ GET    /api/v2/ec/policy/{id}               # Get policy reference
 PUT    /api/v2/ec/policy/{id}               # Update policy reference (admin)
 DELETE /api/v2/ec/policy/{id}               # Delete policy reference (admin)
 
-POST   /api/v2/ec/validate?sbom_id={id}&policy_id={id}        # Trigger validation
+POST   /api/v2/ec/validate                               # Trigger validation (multipart form: sbom_id, policy_id)
 GET    /api/v2/ec/report?sbom_id={id}&policy_id={id}          # Get latest validation result
 GET    /api/v2/ec/report/history?sbom_id={id}&policy_id={id}  # Get validation history
 GET    /api/v2/ec/report/{result_id}                          # Download detailed report from S3
