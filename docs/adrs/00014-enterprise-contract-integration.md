@@ -29,26 +29,35 @@ We will integrate Conforma into Trustify as a user triggered validation service 
 Validation is manually triggered — not automatic on SBOM upload.  
 Validation on upload is deferred to a follow-up version.
 Trustify stores information to identify (id, name, URL) of Policies.
-A defaut Policy is defined at the application level which will be the Policy used for validation if a SBOM doesn't have a Policy attached to it.
+A default Policy is defined at the application level (global policy) which is used for validation when an SBOM does not have any Policy explicitly attached to it.
+An SBOM can also carry references to one or more Policies. This one-to-many relationship between SBOM and Policy is modeled through a join table (`sbom_ec_policy`).
 
 Conforma CLI is deployed separately from Trustify as either a standalone container or equivalent.
 An EC Wrapper (HTTP service) acts as a proxy between Trustify's EC service and Conforma CLI.
 
-Each SBOM + policy pair has a validation state that follows this lifecycle:
+Each SBOM + policy pair has two validation states .
+
+The validation process state of the EC Wrapper follows this lifecycle:
+
+- **Queued** — a user has triggered validation; the request is being processed. Other users can see this state, preventing duplicate validation runs for the same SBOM + policy pair.
+- **In Progress** — the request has been submitted to EC Wrapper.
+- **Completed** — the outcome of the request has been received back from EC Wrapper.
+- **Failed** — an execution error occurred (CLI crash, policy fetch failure, timeout). The error is surfaced separately, and the validation can be re-triggered.
+
+The Policy validation outcome follows this lifecycle:
 
 - **Pending** — initial state, indicates no validation has been triggered yet for this SBOM against this policy.
-- **In Progress** — a user has triggered validation; the request is being processed. Other users can see this state, preventing duplicate validation runs for the same SBOM + policy pair.
-- **Pass** — Conforma validation succeeded; the SBOM satisfies the policy.
 - **Fail** — Conforma validation found policy violations; violation details are linked.
-- **Error** — an execution error occurred (CLI crash, policy fetch failure, timeout). The error is surfaced separately, and the validation can be re-triggered.
+- **Pass** — Conforma validation succeeded; the SBOM satisfies the policy.
+- **Error** — The Conforma validation has generated an error.
 
-The "In Progress" state serves as a concurrency guard: if a validation is already running for a given SBOM + policy pair, subsequent requests are rejected (409 Conflict), preventing duplicate work.
+The `ec_status` "In Progress" state serves as a concurrency guard: if a validation is already running for a given SBOM + policy pair, subsequent requests are rejected (409 Conflict), preventing duplicate work.
 
 What is stored where
 
-- PostgreSQL: validation status, structured violations (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, status, executed_at.
+- PostgreSQL: validation process state (`ec_status`), validation outcome (`status`), structured violations (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, ec_status, status, start_time.
 - Storage system: full raw Conforma JSON report, linked from the DB row via report_path. Keeps DB rows small while preserving audit completeness.
-- Not stored: the policy definitions themselves. ec_policies stores references (URLs, OCI refs) that Conforma fetches at runtime.
+- Not stored: the policy definitions themselves. ec_policy stores references (URLs, OCI refs) that Conforma fetches at runtime.
 
 Storing full JSON in storage system rather than only a summary was chosen explicitly to preserve audit completeness — callers can always fetch the raw report. The DB violations JSONB holds enough structure for filtering and dashboards without duplicating the full payload.
 
@@ -191,13 +200,13 @@ C4Component
     Rel(api, ecEndpoints, "POST /sboms/{id}/ec-validate,\nGET /sboms/{id}/ec-report", "JSON/HTTPS")
     Rel(ecEndpoints, ecService, "validate_sbom() / get_ec_report()", "Function call")
     Rel(ecService, policyManager, "get_policy_config()", "Function call")
-    Rel(policyManager, postgres, "SELECT ec_policies", "SQL")
+    Rel(policyManager, postgres, "SELECT ec_policy", "SQL")
     Rel(ecService, ecWrapper, "POST /api/v1/validation → returns {id}", "HTTP")
     Rel(ecWrapper, conforma, "ec validate", "Process spawn")
     Rel(ecWrapper, api, "POST /api/v2/ec/validation/{validation_id}/result", "JSON/HTTPS")
     Rel(ecService, resultParser, "parse_output()", "Function call")
     Rel(ecService, resultPersistence, "save_results()", "Function call")
-    Rel(resultPersistence, postgres, "INSERT ec_validation_results", "SQL")
+    Rel(resultPersistence, postgres, "INSERT ec_validation_result", "SQL")
     Rel(ecService, s3, "Store EC report", "S3 API")
 
     UpdateRelStyle(api, ecEndpoints, $offsetX="-50", $offsetY="-50")
@@ -229,7 +238,7 @@ sequenceDiagram
     EP->>VS: validate_sbom(sbom_id, policy_id)
 
     VS->>PM: get_policy_configuration(policy_id)
-    PM->>DB: SELECT * FROM ec_policies WHERE id = ?
+    PM->>DB: SELECT * FROM ec_policy WHERE id = ?
     alt Policy not found
         PM-->>VS: Error: PolicyNotFound
         VS-->>EP: 404 Not Found
@@ -243,7 +252,7 @@ sequenceDiagram
         EP-->>API: 404 Not Found
     end
 
-    VS->>DB: SELECT * FROM ec_validation_results WHERE sbom_id = ? AND policy_id = ? AND status = 'in_progress'
+    VS->>DB: SELECT * FROM ec_validation_result WHERE sbom_id = ? AND policy_id = ? AND ec_status IN ('queued', 'in_progress')
     alt Validation already in progress
         VS-->>EP: 409 Conflict {existing job_id}
         EP-->>API: 409 Conflict
@@ -256,7 +265,7 @@ sequenceDiagram
     VS->>Wrapper: POST /api/v1/validation {SBOM, policy_ref}
     Wrapper-->>VS: 202 Accepted {validation_id}
 
-    VS->>DB: INSERT ec_validation_results (status='in_progress', sbom_id, policy_id, validation_id, ...)
+    VS->>DB: INSERT ec_validation_result (ec_status='in_progress', status='pending', sbom_id, policy_id, validation_id, ...)
     VS-->>EP: 202 Accepted {validation_id}
     EP-->>API: 202 Accepted {validation_id}
     API-->>User: 202 Accepted {validation_id}
@@ -294,22 +303,22 @@ sequenceDiagram
     EP->>VS: process_validation_result(validation_id, result)
 
     alt Pass
-        VS->>DB: UPDATE ec_validation_results SET status='pass', violations=[]
+        VS->>DB: UPDATE ec_validation_result SET ec_status='completed', status='pass', violations=[]
         VS->>S3: store_validation_report(result_id, full_json)
-        VS->>DB: UPDATE SET ureport_path = ?
+        VS->>DB: UPDATE SET report_path = ?
     else Fail
-        VS->>DB: UPDATE ec_validation_results SET status='fail', violations=json
+        VS->>DB: UPDATE ec_validation_result SET ec_status='completed', status='fail', violations=json
         VS->>S3: store_validation_report(result_id, full_json)
-        VS->>DB: UPDATE SET report_part = ?
+        VS->>DB: UPDATE SET report_path = ?
     else Error
-        VS->>DB: UPDATE ec_validation_results SET status='error', error_message=detail
-        Note over VS,DB: Validation can be re-triggered (new request will create a new row with status='in_progress')
+        VS->>DB: UPDATE ec_validation_result SET ec_status='failed', status='error', error_message=detail
+        Note over VS,DB: Validation can be re-triggered (new row with ec_status='in_progress', status='pending')
     end
 ```
 
 ### The Data Model
 
-**`ec_policies`** - Stores references to external policies, not the policies themselves
+**`ec_policy`** - Stores references to external policies, not the policies themselves
 
 - `id` (UUID, PK)
 - `name` (VARCHAR, unique) - User-friendly name label
@@ -319,12 +328,19 @@ sequenceDiagram
 - `configuration` (JSONB) - Branch, tag, auth credentials, etc.
 - `created_at`, `updated_at` (TIMESTAMP)
 
+**`sbom_ec_policy`** - Join table linking SBOMs to their attached policies (one SBOM → many policies)
+
+- `sbom_id` (UUID, FK → sbom, PK)
+- `policy_id` (UUID, FK → ec_policy, PK)
+- `created_at` (TIMESTAMP)
+
 **`ec_validation_result`** - one row per validation execution
 
 - `id` (UUID, PK)
 - `sbom_id` (UUID, FK → sbom)
-- `policy_id` (UUID, FK → ec_policies)
-- `status` (ENUM) - 'pending', 'in_progress', 'pass', 'fail', 'error'
+- `policy_id` (UUID, FK → ec_policy)
+- `ec_status` (ENUM) - 'queued', 'in_progress', 'completed', 'failed'
+- `status` (ENUM) - 'pending', 'pass', 'fail', 'error'
 - `violations` (JSONB) - Structured violation data for querying
 - `summary` (JSONB) - Total checks, passed, failed, warnings
 - `report_path` (VARCHAR) - File system or S3 path to detailed report
@@ -336,9 +352,10 @@ sequenceDiagram
 ### Trustify API Endpoints
 
 ```
-POST   /api/v2/sboms/{id}/ec-validate                     # Trigger validation
-GET    /api/v2/sboms/{id}/ec-report                       # Get latest validation result
-GET    /api/v2/sboms/{id}/ec-report/history               # Get validation history
+POST   /api/v2/sbom/{id}/ec-validate                     # Trigger validation
+GET    /api/v2/sbom/{id}/ec-report                       # Get latest validation result
+GET    /api/v2/sbom/{id}/ec-report/history               # Get validation history
+
 GET    /api/v2/ec/report/{result_id}                      # Download detailed report from S3
 POST   /api/v2/ec/validation/{validation_id}/result       # Callback: EC Wrapper posts Conforma result
 
@@ -400,11 +417,11 @@ Temp files (SBOM, any cached policy material) are cleaned up in a finally-equiva
 
 #### Concurrency and Backpressure
 
-On the EC Wrapper side, concurrent Conforma processes are bounded by a semaphore (default: 5). When the semaphore is exhausted, the EC Wrapper returns 429 Too Many Requests to Trustify, which propagates the status to the caller. This makes the capacity limit explicit to callers (e.g., CI pipelines can implement their own retry with backoff). On the Trustify side, the "In Progress" concurrency guard (409 Conflict) prevents duplicate validation runs for the same SBOM + policy pair. If demand grows to warrant it, a proper queue (Redis/RabbitMQ) is the deferred alternative considered below.
+On the EC Wrapper side, concurrent Conforma processes are bounded by a semaphore (default: 5). When the semaphore is exhausted, the EC Wrapper returns 429 Too Many Requests to Trustify, which propagates the status to the caller. This makes the capacity limit explicit to callers (e.g., CI pipelines can implement their own retry with backoff). On the Trustify side, the `ec_status` "In Progress" concurrency guard (409 Conflict) prevents duplicate validation runs for the same SBOM + policy pair. If demand grows to warrant it, a proper queue (Redis/RabbitMQ) is the deferred alternative considered below.
 
 #### Policy Management
 
-ec_policies stores external references only. Conforma fetches the actual policy at validation time, which means Trustify does not cache policy content by default. The trade-off: validation always uses the latest policy version, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the configuration JSONB column and will be encrypted using AES crate; they are never logged.
+ec_policy stores external references only. Conforma fetches the actual policy at validation time, which means Trustify does not cache policy content by default. The trade-off: validation always uses the latest policy version, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the configuration JSONB column and will be encrypted using AES crate; they are never logged.
 
 The policy commit hash/tag (`policy_version`) resolved at validation time are recorded in each result row, enabling reproducibility and audit.
 
