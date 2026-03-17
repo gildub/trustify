@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773315435934,
+  "lastUpdate": 1773752505239,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -14963,6 +14963,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "committer": {
+            "email": "desmax74@users.noreply.github.com",
+            "name": "Massimiliano Dessì - (Fast Chauffeur)",
+            "username": "desmax74"
+          },
+          "distinct": true,
+          "id": "969c97922d02cc7c04100447db440fee87f617fb",
+          "message": "ci: refresh dependencies\n\nMostly replacing actions which still use Node 20, which is deprecated.\n\nAlso see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/",
+          "timestamp": "2026-03-17T11:10:23Z",
+          "tree_id": "b5d9eacb3f3ff1003338ffbfe28e26e98a813022",
+          "url": "https://github.com/gildub/trustify/commit/969c97922d02cc7c04100447db440fee87f617fb"
+        },
+        "date": 1773752503393,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 10,
             "unit": "s"
           }
         ]
