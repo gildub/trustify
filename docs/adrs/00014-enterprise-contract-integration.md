@@ -62,7 +62,7 @@ Storing full JSON in storage system rather than only a summary was chosen explic
 
 ## Consequences
 
-### Why EC runs externally
+### EC Wrapper runs externally
 
 EC validation can be be very resource-intensive (especially for large SBOMs with thousands of packages) and it should not compete with Trustify.
 A dedicated EC Wrapper running alonside EC instance (Conforma CLI, etc) provides :
