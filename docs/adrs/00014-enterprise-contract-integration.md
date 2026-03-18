@@ -225,7 +225,7 @@ C4Component
     Rel(ecWrapper, api, "POST /api/v2/ec/validation/{validation_id}/result", "JSON/HTTPS")
     Rel(ecService, resultParser, "parse_output()", "Function call")
     Rel(ecService, resultPersistence, "save_results()", "Function call")
-    Rel(resultPersistence, postgres, "INSERT ec_validation_result", "SQL")
+    Rel(resultPersistence, postgres, "INSERT ec_validation", "SQL")
     Rel(ecService, s3, "Store EC report", "S3 API")
 
     UpdateRelStyle(api, ecEndpoints, $offsetX="-50", $offsetY="-50")
@@ -271,7 +271,7 @@ sequenceDiagram
         EP-->>API: 404 Not Found
     end
 
-    VS->>DB: SELECT * FROM ec_validation_result WHERE sbom_id = ? AND policy_id = ? AND ec_status IN ('queued', 'in_progress')
+    VS->>DB: SELECT * FROM ec_validation WHERE sbom_id = ? AND policy_id = ? AND ec_status IN ('queued', 'in_progress')
     alt Validation already in progress
         VS-->>EP: 409 Conflict {existing job_id}
         EP-->>API: 409 Conflict
@@ -284,7 +284,7 @@ sequenceDiagram
     VS->>Wrapper: POST /api/v1/validate {SBOM, policy_ref}
     Wrapper-->>VS: 202 Accepted {validation_id}
 
-    VS->>DB: INSERT ec_validation_result (ec_status='in_progress', status='pending', sbom_id, policy_id, validation_id, ...)
+    VS->>DB: INSERT ec_validation (ec_status='in_progress', status='pending', sbom_id, policy_id, validation_id, ...)
     VS-->>EP: 202 Accepted {validation_id}
     EP-->>API: 202 Accepted {validation_id}
     API-->>User: 202 Accepted {validation_id}
@@ -322,15 +322,15 @@ sequenceDiagram
     EP->>VS: process_validation_result(validation_id, result)
 
     alt Pass
-        VS->>DB: UPDATE ec_validation_result SET ec_status='completed', status='pass', results=[]
+        VS->>DB: UPDATE ec_validation SET ec_status='completed', status='pass', results=[]
         VS->>S3: store_validation_report(result_id, full_json)
         VS->>DB: UPDATE SET report_path = ?
     else Fail
-        VS->>DB: UPDATE ec_validation_result SET ec_status='completed', status='fail', results=json
+        VS->>DB: UPDATE ec_validation SET ec_status='completed', status='fail', results=json
         VS->>S3: store_validation_report(result_id, full_json)
         VS->>DB: UPDATE SET report_path = ?
     else Error
-        VS->>DB: UPDATE ec_validation_result SET ec_status='failed', status='error', error_message=detail
+        VS->>DB: UPDATE ec_validation SET ec_status='failed', status='error', error_message=detail
         Note over VS,DB: Validation can be re-triggered (new row with ec_status='in_progress', status='pending')
     end
 ```
@@ -377,7 +377,7 @@ sequenceDiagram
 }
 ```
 
-**`ec_validation_result`** - one row per validation execution
+**`ec_validation`** - one row per validation execution
 
 - `id` (UUID, PK)
 - `sbom_id` (UUID, FK → sbom)
@@ -392,7 +392,7 @@ sequenceDiagram
 - `policy_version` (VARCHAR) - Policy commit hash or tag resolved at validation time
 - `error_message` (TEXT) - Populated only on error status
 
-**`ec_validation_result.results` JSONB model:**
+**`ec_validation.results` JSONB model:**
 
 | Field                  | Type   | Required | Description                                             |
 | ---------------------- | ------ | -------- | ------------------------------------------------------- |
@@ -404,7 +404,7 @@ sequenceDiagram
 | `metadata.description` | string | no       | Detailed explanation of what the rule checks            |
 | `metadata.solution`    | string | no       | Suggested remediation (absent for successes)            |
 
-`ec_validation_result.results` example:
+`ec_validation.results` example:
 
 ```json
 [
@@ -440,7 +440,7 @@ sequenceDiagram
 ]
 ```
 
-**`ec_validation_result.summary` JSONB model:**
+**`ec_validation.summary` JSONB model:**
 
 | Field            | Type    | Required | Description                                                              |
 | ---------------- | ------- | -------- | ------------------------------------------------------------------------ |
@@ -452,7 +452,7 @@ sequenceDiagram
 | `ec_version`     | string  | yes      | Conforma version used (e.g. `"v0.8.83"`)                                 |
 | `effective_time` | string  | yes      | ISO 8601 timestamp of evaluation from Conforma                           |
 
-`ec_validation_result.summary` example:
+`ec_validation.summary` example:
 
 ```json
 {
