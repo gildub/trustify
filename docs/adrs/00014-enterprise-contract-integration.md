@@ -344,7 +344,7 @@ sequenceDiagram
 - `description` (TEXT) - What this policy enforces
 - `policy_type` (ENUM) - 'Conforma'
 - `configuration` (JSONB) - See model below
-- `created_at`, `updated_at` (TIMESTAMP)
+- `revision`(UUID) - Conditional UPDATE filtering both the primary key and the current revision
 
 **`ec_policy.configuration` JSONB model:**
 
