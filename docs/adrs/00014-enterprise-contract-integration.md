@@ -10,7 +10,7 @@ PROPOSED
 
 Trustify provides SBOM storage, analysis, and vulnerability tracking but lacks automated policy enforcement. Organizations need to validate SBOMs against security and compliance policies (licensing, vulnerabilities, provenance) without relying on manual, inconsistent review processes.
 
-Enterprise Contract (Conforma) is an open-source policy enforcement tool actively maintained by Red Hat. It validates SBOMs against configurable policies and produces structured JSON output. Currently it provides only a CLI; a REST API is planned but with no committed timeline.
+Conforma (former Enterprise Contract) is an open-source policy enforcement tool actively maintained by Red Hat. It validates SBOMs against configurable policies and produces structured JSON output. Currently it provides only a CLI; a REST API is planned but with no committed timeline.
 
 ### Requirements
 
@@ -32,15 +32,15 @@ Trustify stores information to identify (id, name, URL) of Policies.
 A default Policy is defined at the application level (global policy) which is used for validation when an SBOM does not have any Policy explicitly attached to it.
 
 Conforma CLI is deployed separately from Trustify as either a standalone container or equivalent.
-An EC Wrapper (HTTP service) acts as a proxy between Trustify's EC service and Conforma CLI.
+A Conforma Wrapper (HTTP service) acts as a proxy between Trustify's Policy Verifier service and Conforma CLI.
 
 Each SBOM + policy pair has two validation states .
 
-The validation process state of the EC Wrapper follows this lifecycle:
+The validation process state of the Conforma Wrapper follows this lifecycle:
 
 - **Queued** — a user has triggered validation; the request is being processed. Other users can see this state, preventing duplicate validation runs for the same SBOM + policy pair.
-- **In Progress** — the request has been submitted to EC Wrapper.
-- **Completed** — the outcome of the request has been received back from EC Wrapper.
+- **In Progress** — the request has been submitted to Conforma Wrapper.
+- **Completed** — the outcome of the request has been received back from Conforma Wrapper.
 - **Failed** — an execution error occurred (CLI crash, policy fetch failure, timeout). The error is surfaced separately, and the validation can be re-triggered.
 
 The Policy validation outcome follows this lifecycle:
@@ -50,13 +50,13 @@ The Policy validation outcome follows this lifecycle:
 - **Pass** — Conforma validation succeeded; the SBOM satisfies the policy.
 - **Error** — The Conforma validation has generated an error.
 
-The `ec_status` "In Progress" state serves as a concurrency guard: if a validation is already running for a given SBOM + policy pair, subsequent requests are rejected (409 Conflict), preventing duplicate work.
+The `processing_status` "In Progress" state serves as a concurrency guard: if a validation is already running for a given SBOM + policy pair, subsequent requests are rejected (409 Conflict), preventing duplicate work.
 
 What is stored where
 
-- PostgreSQL: validation process state (`ec_status`), validation outcome (`status`), structured results (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, ec_status, status, start_time.
+- PostgreSQL: validation process state (`processing_status`), validation outcome (`status`), structured results (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, processing_status, status, start_time.
 - Storage system: full raw Conforma JSON report, linked from the DB row via report_path. Keeps DB rows small while preserving audit completeness.
-- Not stored: the policy definitions themselves. ec_policy stores references (URLs, OCI refs) that Conforma fetches at runtime.
+- Not stored: the policy definitions themselves. policy stores references (URLs, OCI refs) that Conforma fetches at runtime.
 
 Storing full JSON in storage system rather than only a summary was chosen explicitly to preserve audit completeness — callers can always fetch the raw report. The DB results JSONB holds enough structure for filtering and dashboards without duplicating the full payload.
 
@@ -68,23 +68,23 @@ Policy references are global (shared across all users) in this initial implement
 
 ## Consequences
 
-### EC Wrapper runs externally
+### The Conforma Wrapper runs externally
 
 EC validation can be be very resource-intensive (especially for large SBOMs with thousands of packages) and it should not compete with Trustify.
-A dedicated EC Wrapper running alonside EC instance (Conforma CLI, etc) provides :
+A dedicated Conforma Wrapper running alonside EC instance (Conforma CLI, etc) provides :
 
 - **Resource isolation** — A long-running or memory-heavy Conforma process cannot degrade Trustify's responsiveness.
-- **Independent scaling** — The EC Wrapper can be scaled horizontally (more replicas) based on validation demand without scaling the entire Trustify deployment. Conversely, Trustify can scale for query load without provisioning excess capacity for validation.
-- **Failure containment** — An EC instance crash (OOM kill, policy fetch timeout, unexpected CLI error) is isolated to the wrapper. Trustify records the failure in `ec_status` and remains fully operational; the validation can be re-triggered.
-- **Version independence** — The EC Wrapper and EC instance (Conforma CLI) can be upgraded or rolled back on their own release cadence, without redeploying Trustify. This is important given Conforma's active development pace.
+- **Independent scaling** — The Conforma Wrapper can be scaled horizontally (more replicas) based on validation demand without scaling the entire Trustify deployment. Conversely, Trustify can scale for query load without provisioning excess capacity for validation.
+- **Failure containment** — An EC instance crash (OOM kill, policy fetch timeout, unexpected CLI error) is isolated to the wrapper. Trustify records the failure in `processing_status` and remains fully operational; the validation can be re-triggered.
+- **Version independence** — The Conforma Wrapper and EC instance (Conforma CLI) can be upgraded or rolled back on their own release cadence, without redeploying Trustify. This is important given Conforma's active development pace.
 
-The trade-off is added infrastructure complexity: the EC Wrapper must be deployed separatly with EC instance, monitored, and maintained as a separate component alongside the Conforma CLI binary.
+The trade-off is added infrastructure complexity: the Conforma Wrapper must be deployed separatly with EC instance, monitored, and maintained as a separate component alongside the Conforma CLI binary.
 
-In Kubernetes or standalone machine deployments, the EC Wrapper pod has its own resource requests/limits, independent of the Trustify pod.
+In Kubernetes or standalone machine deployments, the Conforma Wrapper pod has its own resource requests/limits, independent of the Trustify pod.
 
 ### CLI spawning
 
-Within the EC Wrapper, Conforma is invoked via CLI spawning rather than a native API. This introduces an operational dependency (Conforma must be installed and version-pinned on every EC Wrapper instance) and per-validation process spawning overhead. These are accepted trade-offs given that no Conforma REST API exists yet. On the Trustify side, the EC service interacts with the EC Wrapper over HTTP and is built behind an adapter interface, so the implementation can be swapped for a direct Conforma REST client when one becomes available, without changes to the service layer or API.
+Within the Conforma Wrapper, Conforma is invoked via CLI spawning rather than a native API. This introduces an operational dependency (Conforma must be installed and version-pinned on every Conforma Wrapper instance) and per-validation process spawning overhead. These are accepted trade-offs given that no Conforma REST API exists yet. On the Trustify side, the Policy Verifier service interacts with the Conforma Wrapper over HTTP and is built behind an adapter interface, so the implementation can be swapped for a direct Conforma REST client when one becomes available, without changes to the service layer or API.
 
 ### Alternatives Considered
 
@@ -139,13 +139,13 @@ C4Container
         Container(webui, "Web UI", "Rust/Actix", "Trustify GUI")
         Container(api, "API Gateway", "Actix-web", "REST API endpoints for SBOM <br/> and compliance operations")
         ContainerDb(postgres, "PostgreSQL", "DBMS", "Stores SBOM metadata, relationships, <br/>and EC validation results")
-        Container(ecModule, "EC Validation Module", "Rust", "Orchestrates validation via<br/>EC Wrapper and persists results")
+        Container(ecModule, "EC Validation Module", "Rust", "Orchestrates validation via<br/>Conforma Wrapper and persists results")
         ContainerDb(s3, "Object Storage", "S3/Minio", "Stores SBOM documents and EC reports")
         Container(storage, "Storage Service", "Rust", "Manages document storage<br/>(SBOMs, policy results)")
     }
 
     Container_Boundary(conformaSystem, "Conforma System") {
-        Container(ecWrapper, "EC Wrapper", "Rust/Actix", "HTTP Wrapper")
+        Container(ecWrapper, "Conforma Wrapper", "Rust/Actix", "HTTP Wrapper")
         System_Ext(conforma, "Conforma CLI", "External policy validation tool")
     }
 
@@ -194,7 +194,7 @@ C4Component
         Container(api, "API Gateway", "Actix-web", "REST API for EC operations")
         Container_Boundary(ecModule, "EC Validation Module") {
             Container(ecEndpoints, "EC Endpoints", "Actix-web handlers", "REST endpoints for validation operations")
-            Component(ecService, "EC Service", "Business logic", "Orchestrates validation workflow")
+            Component(ecService, "Policy Verifier service", "Business logic", "Orchestrates validation workflow")
             Component(resultParser, "Result Parser", "JSON parser", "Parses Conforma output into structured data")
             Component(policyManager, "Policy Manager", "Business logic", "Manages EC policy references and<br/>configuration")
             Component(resultPersistence, "Result Persistence", "Database layer", "Saves validation results")
@@ -202,7 +202,7 @@ C4Component
     }
     Deployment_Node(external, "External System") {
         Deployment_Node(trustifyPod, "Trustify Pod") {
-            Component(ecWrapper, "EC Wrapper", "Actix-web handlers", "HTTP API")
+            Component(ecWrapper, "Conforma Wrapper", "Actix-web handlers", "HTTP API")
         }
         Deployment_Node(conformaPod, "Conforma Pod") {
             System_Ext(conforma, "Conforma CLI", "Enterprise Contract validation tool")
@@ -219,13 +219,13 @@ C4Component
     Rel(api, ecEndpoints, "POST /ec/validate,\nGET /ec/report", "JSON/HTTPS")
     Rel(ecEndpoints, ecService, "validate_sbom() / get_ec_report()", "Function call")
     Rel(ecService, policyManager, "get_policy_config()", "Function call")
-    Rel(policyManager, postgres, "SELECT ec_policy", "SQL")
+    Rel(policyManager, postgres, "SELECT policy", "SQL")
     Rel(ecService, ecWrapper, "POST /api/v1/validation → returns {id}", "HTTP")
     Rel(ecWrapper, conforma, "ec validate", "Process spawn")
     Rel(ecWrapper, api, "POST /api/v2/ec/validation/{validation_id}/result", "JSON/HTTPS")
     Rel(ecService, resultParser, "parse_output()", "Function call")
     Rel(ecService, resultPersistence, "save_results()", "Function call")
-    Rel(resultPersistence, postgres, "INSERT ec_validation", "SQL")
+    Rel(resultPersistence, postgres, "INSERT policy_validation", "SQL")
     Rel(ecService, s3, "Store EC report", "S3 API")
 
     UpdateRelStyle(api, ecEndpoints, $offsetX="-50", $offsetY="-50")
@@ -246,18 +246,18 @@ sequenceDiagram
     actor User
     participant API as Trustify API
     participant EP as EC Endpoints
-    participant VS as EC Service
+    participant VS as Policy Verifier service
     participant PM as Policy Manager
     participant DB as PostgreSQL
     participant S3 as Object Storage
-    participant Wrapper as EC Wrapper (HTTP)
+    participant Wrapper as Conforma Wrapper (HTTP)
 
     User->>API: POST /api/v2/ec/validate (multipart form: sbom_id, policy_id)
     API->>EP: dispatch request
     EP->>VS: validate_sbom(sbom_id, policy_id)
 
     VS->>PM: get_policy_configuration(policy_id)
-    PM->>DB: SELECT * FROM ec_policy WHERE id = ?
+    PM->>DB: SELECT * FROM policy WHERE id = ?
     alt Policy not found
         PM-->>VS: Error: PolicyNotFound
         VS-->>EP: 404 Not Found
@@ -271,7 +271,7 @@ sequenceDiagram
         EP-->>API: 404 Not Found
     end
 
-    VS->>DB: SELECT * FROM ec_validation WHERE sbom_id = ? AND policy_id = ? AND ec_status IN ('queued', 'in_progress')
+    VS->>DB: SELECT * FROM policy_validation WHERE sbom_id = ? AND policy_id = ? AND processing_status IN ('queued', 'in_progress')
     alt Validation already in progress
         VS-->>EP: 409 Conflict {existing job_id}
         EP-->>API: 409 Conflict
@@ -284,7 +284,7 @@ sequenceDiagram
     VS->>Wrapper: POST /api/v1/validate {SBOM, policy_ref}
     Wrapper-->>VS: 202 Accepted {validation_id}
 
-    VS->>DB: INSERT ec_validation (ec_status='in_progress', status='pending', sbom_id, policy_id, validation_id, ...)
+    VS->>DB: INSERT policy_validation (processing_status='in_progress', status='pending', sbom_id, policy_id, validation_id, ...)
     VS-->>EP: 202 Accepted {validation_id}
     EP-->>API: 202 Accepted {validation_id}
     API-->>User: 202 Accepted {validation_id}
@@ -297,10 +297,10 @@ sequenceDiagram
     autonumber
     participant API as Trustify API
     participant EP as EC Endpoints
-    participant VS as EC Service
+    participant VS as Policy Verifier service
     participant DB as PostgreSQL
     participant S3 as Object Storage
-    participant Wrapper as EC Wrapper (HTTP)
+    participant Wrapper as Conforma Wrapper (HTTP)
     participant Conf as Conforma CLI
 
     Note over Wrapper: Wrapper holds validation_id from the initial request
@@ -322,22 +322,22 @@ sequenceDiagram
     EP->>VS: process_validation_result(validation_id, result)
 
     alt Pass
-        VS->>DB: UPDATE ec_validation SET ec_status='completed', status='pass', results=[]
+        VS->>DB: UPDATE policy_validation SET verification_status='completed', status='pass', results=[]
         VS->>S3: store_validation_report(result_id, full_json)
         VS->>DB: UPDATE SET report_path = ?
     else Fail
-        VS->>DB: UPDATE ec_validation SET ec_status='completed', status='fail', results=json
+        VS->>DB: UPDATE policy_validation SET verification_status='completed', status='fail', results=json
         VS->>S3: store_validation_report(result_id, full_json)
         VS->>DB: UPDATE SET report_path = ?
     else Error
-        VS->>DB: UPDATE ec_validation SET ec_status='failed', status='error', error_message=detail
-        Note over VS,DB: Validation can be re-triggered (new row with ec_status='in_progress', status='pending')
+        VS->>DB: UPDATE policy_validation SET verification_status='failed', status='error', error_message=detail
+        Note over VS,DB: Validation can be re-triggered (new row with processing_status='in_progress', status='pending')
     end
 ```
 
 ### The Data Model
 
-**`ec_policy`** - Stores references to external policies, not the policies themselves
+**`policy`** - Stores references to external policies, not the policies themselves
 
 - `id` (UUID, PK)
 - `name` (VARCHAR, unique) - User-friendly name label
@@ -346,7 +346,7 @@ sequenceDiagram
 - `configuration` (JSONB) - See model below
 - `revision`(UUID) - Conditional UPDATE filtering both the primary key and the current revision
 
-**`ec_policy.configuration` JSONB model:**
+**`policy.configuration` JSONB model:**
 
 | Field                  | Type     | Required        | Description                                                                      |
 | ---------------------- | -------- | --------------- | -------------------------------------------------------------------------------- |
@@ -360,7 +360,7 @@ sequenceDiagram
 | `timeout_seconds`      | integer  | no              | Per-policy override of the default 5-minute execution timeout                    |
 | `extra_args`           | string[] | no              | Additional CLI flags forwarded verbatim to Conforma                              |
 
-`ec_policy.configuration` example :
+`policy.configuration` example :
 
 ```json
 {
@@ -377,13 +377,13 @@ sequenceDiagram
 }
 ```
 
-**`ec_validation`** - one row per validation execution
+**`policy_validation`** - one row per validation execution
 
 - `id` (UUID, PK)
 - `sbom_id` (UUID, FK → sbom)
-- `policy_id` (UUID, FK → ec_policy)
+- `policy_id` (UUID, FK → policy)
 - `processing_status` (ENUM) - 'queued', 'in_progress', 'completed', 'failed'
-- `validation_status` (ENUM) - 'pending', 'pass', 'fail', 'error'
+- `verification_status` (ENUM) - 'pending', 'pass', 'fail', 'error'
 - `results` (JSONB) - See model below
 - `summary` (JSONB) - Total checks, passed, failed, warnings, see model below
 - `report_path` (VARCHAR) - File system or S3 path to detailed report
@@ -392,7 +392,7 @@ sequenceDiagram
 - `policy_version` (VARCHAR) - Policy commit hash or tag resolved at validation time
 - `error_message` (TEXT) - Populated only on error status
 
-**`ec_validation.results` JSONB model:**
+**`policy_validation.results` JSONB model:**
 
 | Field                  | Type   | Required | Description                                             |
 | ---------------------- | ------ | -------- | ------------------------------------------------------- |
@@ -404,7 +404,7 @@ sequenceDiagram
 | `metadata.description` | string | no       | Detailed explanation of what the rule checks            |
 | `metadata.solution`    | string | no       | Suggested remediation (absent for successes)            |
 
-`ec_validation.results` example:
+`policy_validation.results` example:
 
 ```json
 [
@@ -440,7 +440,7 @@ sequenceDiagram
 ]
 ```
 
-**`ec_validation.summary` JSONB model:**
+**`policy_validation.summary` JSONB model:**
 
 | Field            | Type    | Required | Description                                                              |
 | ---------------- | ------- | -------- | ------------------------------------------------------------------------ |
@@ -452,7 +452,7 @@ sequenceDiagram
 | `ec_version`     | string  | yes      | Conforma version used (e.g. `"v0.8.83"`)                                 |
 | `effective_time` | string  | yes      | ISO 8601 timestamp of evaluation provided by Conforma                    |
 
-`ec_validation.summary` example:
+`policy_validation.summary` example:
 
 ```json
 {
@@ -469,21 +469,21 @@ sequenceDiagram
 ### Trustify API Endpoints
 
 ```
-POST   /api/v2/ec/policy                    # Create policy reference (admin)
-GET    /api/v2/ec/policy                    # List policy references
-GET    /api/v2/ec/policy/{id}               # Get policy reference
-PUT    /api/v2/ec/policy/{id}               # Update policy reference (admin)
-DELETE /api/v2/ec/policy/{id}               # Delete policy reference (admin)
+POST   /api/v2/policy                    # Create policy reference (admin)
+GET    /api/v2/policy                    # List policy references
+GET    /api/v2/policy/{id}               # Get policy reference
+PUT    /api/v2/policy/{id}               # Update policy reference (admin)
+DELETE /api/v2/policy/{id}               # Delete policy reference (admin)
 
-POST   /api/v2/ec/validate                               # Trigger validation (multipart form: sbom_id, policy_id)
-GET    /api/v2/ec/report?sbom_id={id}&policy_id={id}          # Get latest validation result
-GET    /api/v2/ec/report/history?sbom_id={id}&policy_id={id}  # Get validation history
-GET    /api/v2/ec/report/{result_id}                          # Download detailed report from S3
+POST   /api/v2/policy/validate                                    # Trigger validation (multipart form: sbom_id, policy_id)
+GET    /api/v2/policy/report?sbom_id={id}&policy_id={id}          # Get latest validation result
+GET    /api/v2/policy/report/history?sbom_id={id}&policy_id={id}  # Get validation history
+GET    /api/v2/policy/report/{result_id}                          # Download detailed report from S3
 
-POST   /api/v2/ec/validation/{validation_id}/result       # Callback: EC Wrapper posts Conforma result
+POST   /api/v2/ec/validation/{validation_id}/result       # Callback: Conforma Wrapper posts Conforma result
 ```
 
-## Conforma EC Wrapper API Endpoints
+## Conforma Wrapper API Endpoints
 
 ```
 POST   /api/v1/validate                     # Validate uploaded SBOM file against the provided Policy URL (multipart form)
@@ -492,7 +492,7 @@ POST   /api/v1/validate                     # Validate uploaded SBOM file agains
 ### Trustify Module Structure
 
 ```
-modules/ec/
+modules/policy/
 ├── Cargo.toml
 └── src/
     ├── lib.rs
@@ -506,12 +506,12 @@ modules/ec/
     │   ├── mod.rs
     │   ├── ec_service.rs       # Main orchestration
     │   ├── policy_manager.rs   # Policy configuration
-    │   ├── executor.rs         # EC Wrapper HTTP client (adapter)
+    │   ├── executor.rs         # Conforma Wrapper HTTP client (adapter)
     │   └── result_parser.rs    # Output parsing
     └── error.rs                # Error types
 ```
 
-### HTTP Wrapper Module Structure
+### Conforma Wrapper Module Structure
 
 ```
 ├── Cargo.toml
@@ -524,9 +524,9 @@ modules/ec/
 
 ### Technical Considerations
 
-#### Conforma CLI Execution (HTTPEC Wrapper)
+#### Conforma CLI Execution
 
-The HTTP Wrapper invokes Conforma via process spawning (e.g., `tokio::process::Command`). All arguments are passed as an array — never as a shell string — to prevent CLI injection. Execution has a configurable timeout (default 5 minutes); large SBOMs are written to a temp file and passed by path rather than piped via stdin, which avoids OOM issues.
+The Conforma Wrapper invokes Conforma CLI via process spawning (e.g., `tokio::process::Command`). All arguments are passed as an array — never as a shell string — to prevent CLI injection. Execution has a configurable timeout (default 5 minutes); large SBOMs are written to a temp file and passed by path rather than piped via stdin, which avoids OOM issues.
 
 Exit codes are treated as follows: 0 = pass, 1 = policy violations (expected failure, not an error), 2+ = execution error. It is important to distinguish 1 from 2+ in error handling — a policy violation is a valid result that should be surfaced to the user, not treated as a system failure.
 
@@ -534,11 +534,11 @@ Temp files (SBOM, any cached policy material) are cleaned up in a finally-equiva
 
 #### Concurrency and Backpressure
 
-On the EC Wrapper side, concurrent Conforma processes are bounded by a semaphore (default: 5). When the semaphore is exhausted, the EC Wrapper returns 429 Too Many Requests to Trustify, which propagates the status to the caller. This makes the capacity limit explicit to callers (e.g., CI pipelines can implement their own retry with backoff). On the Trustify side, the `ec_status` "In Progress" concurrency guard (409 Conflict) prevents duplicate validation runs for the same SBOM + policy pair. If demand grows to warrant it, a proper queue (Redis/RabbitMQ) is the deferred alternative considered below.
+On the Conforma Wrapper side, concurrent Conforma processes are bounded by a semaphore (default: 5). When the semaphore is exhausted, the Conforma Wrapper returns 429 Too Many Requests to Trustify, which propagates the status to the caller. This makes the capacity limit explicit to callers (e.g., CI pipelines can implement their own retry with backoff). On the Trustify side, the `processing_status` "In Progress" concurrency guard (409 Conflict) prevents duplicate validation runs for the same SBOM + policy pair. If demand grows to warrant it, a proper queue (Redis/RabbitMQ) is the deferred alternative considered below.
 
 #### Policy Management
 
-ec_policy stores external references only. Conforma fetches the actual policy at validation time, which means Trustify does not cache policy content by default. The trade-off: validation always uses the latest policy version, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the configuration JSONB column and will be encrypted using AES crate; they are never logged.
+policy stores external references only. Conforma fetches the actual policy at validation time, which means Trustify does not cache policy content by default. The trade-off: validation always uses the latest policy version, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the configuration JSONB column and will be encrypted using AES crate; they are never logged.
 
 The policy commit hash/tag (`policy_version`) resolved at validation time are recorded in each result row, enabling reproducibility and audit.
 
