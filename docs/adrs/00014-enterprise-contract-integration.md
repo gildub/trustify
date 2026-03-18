@@ -382,10 +382,10 @@ sequenceDiagram
 - `id` (UUID, PK)
 - `sbom_id` (UUID, FK → sbom)
 - `policy_id` (UUID, FK → ec_policy)
-- `ec_status` (ENUM) - 'queued', 'in_progress', 'completed', 'failed'
-- `status` (ENUM) - 'pending', 'pass', 'fail', 'error'
+- `processing_status` (ENUM) - 'queued', 'in_progress', 'completed', 'failed'
+- `validation_status` (ENUM) - 'pending', 'pass', 'fail', 'error'
 - `results` (JSONB) - See model below
-- `summary` (JSONB) - Total checks, passed, failed, warnings
+- `summary` (JSONB) - Total checks, passed, failed, warnings, see model below
 - `report_path` (VARCHAR) - File system or S3 path to detailed report
 - `start_time` (TIMESTAMP)
 - `end_time` (TIMESTAMP)
@@ -450,7 +450,7 @@ sequenceDiagram
 | `warnings`       | integer | yes      | Count of checks with warning severity                                    |
 | `successes`      | integer | yes      | Count of checks that passed                                              |
 | `ec_version`     | string  | yes      | Conforma version used (e.g. `"v0.8.83"`)                                 |
-| `effective_time` | string  | yes      | ISO 8601 timestamp of evaluation from Conforma                           |
+| `effective_time` | string  | yes      | ISO 8601 timestamp of evaluation provided by Conforma                    |
 
 `ec_validation.summary` example:
 
