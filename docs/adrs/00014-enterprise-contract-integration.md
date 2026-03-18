@@ -342,7 +342,7 @@ sequenceDiagram
 - `id` (UUID, PK)
 - `name` (VARCHAR, unique) - User-friendly name label
 - `description` (TEXT) - What this policy enforces
-- `policy_type` (VARCHAR) - 'Git URL'
+- `policy_type` (ENUM) - 'Conforma'
 - `configuration` (JSONB) - See model below
 - `created_at`, `updated_at` (TIMESTAMP)
 
