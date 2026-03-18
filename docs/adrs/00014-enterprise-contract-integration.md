@@ -129,7 +129,7 @@ C4Context
     UpdateLayoutConfig($c4ShapeInRow="2", $c4BoundaryInRow="1")
 ```
 
-### Container Diagram - EC Validation Module
+### Container Diagram - Policy Validation Module
 
 ```mermaid
 C4Container
@@ -139,13 +139,13 @@ C4Container
         Container(webui, "Web UI", "Rust/Actix", "Trustify GUI")
         Container(api, "API Gateway", "Actix-web", "REST API endpoints for SBOM <br/> and compliance operations")
         ContainerDb(postgres, "PostgreSQL", "DBMS", "Stores SBOM metadata, relationships, <br/>and EC validation results")
-        Container(ecModule, "EC Validation Module", "Rust", "Orchestrates validation via<br/>Conforma Wrapper and persists results")
+        Container(policyValidationModule, "Policy Validation Module", "Rust", "Orchestrates validation via<br/>Conforma Wrapper and persists results")
         ContainerDb(s3, "Object Storage", "S3/Minio", "Stores SBOM documents and EC reports")
         Container(storage, "Storage Service", "Rust", "Manages document storage<br/>(SBOMs, policy results)")
     }
 
     Container_Boundary(conformaSystem, "Conforma System") {
-        Container(ecWrapper, "Conforma Wrapper", "Rust/Actix", "HTTP Wrapper")
+        Container(conformaWrapper, "Conforma Wrapper", "Rust/Actix", "HTTP Wrapper")
         System_Ext(conforma, "Conforma CLI", "External policy validation tool")
     }
 
@@ -161,25 +161,25 @@ C4Container
     Rel(user, webui, "Views compliance status", "HTTP API")
     Rel(user, api, "Views compliance status", "HTTP API")
     Rel(webui, api, "API calls", "JSON/HTTP API")
-    Rel(api, ecModule, "Triggers validation", "Function call")
-    Rel(ecModule, ecWrapper, "POST /validation", "HTTP API formData")
-    Rel(ecWrapper, api, "POST /validation/{id}/result", "HTTP API")
-    Rel(ecWrapper, conforma, "ec validate input {SBOM} {policy}", "Spawned command")
-    Rel(ecModule, postgres, "Saves validation<br/>results", "SQL")
-    Rel(ecModule, storage, "Stores EC reports", "Function call")
+    Rel(api, policyValidationModule, "Triggers validation", "Function call")
+    Rel(policyValidationModule, conformaWrapper, "POST /validation", "HTTP API formData")
+    Rel(conformaWrapper, api, "POST /validation/{id}/result", "HTTP API")
+    Rel(conformaWrapper, conforma, "ec validate input {SBOM} {policy}", "Spawned command")
+    Rel(policyValidationModule, postgres, "Saves validation<br/>results", "SQL")
+    Rel(policyValidationModule, storage, "Stores EC reports", "Function call")
     Rel(storage, s3, "Persists reports", "S3 API")
     Rel(conforma, policyRepo, "Fetches policies", "Git/HTTPS")
-    Rel(ecWrapper, oidc, "Authenticate", "OAuth API")
+    Rel(conformaWrapper, oidc, "Authenticate", "OAuth API")
 
     UpdateRelStyle(user, webui, $offsetX="-60", $offsetY="30")
     UpdateRelStyle(user, api, $offsetX="-60", $offsetY="-50")
     UpdateRelStyle(webui, api, $offsetX="-40", $offsetY="10")
-    UpdateRelStyle(ecModule, ecWrapper, $offsetX="-50", $offsetY="-20")
-    UpdateRelStyle(ecWrapper, api, $offsetX="-60", $offsetY="-10")
-    UpdateRelStyle(ecModule, postgres, $offsetX="-40", $offsetY="10")
+    UpdateRelStyle(policyValidationModule, conformaWrapper, $offsetX="-50", $offsetY="-20")
+    UpdateRelStyle(conformaWrapper, api, $offsetX="-60", $offsetY="-10")
+    UpdateRelStyle(policyValidationModule, postgres, $offsetX="-40", $offsetY="10")
     UpdateRelStyle(storage, s3, $offsetX="-40", $offsetY="10")
     UpdateRelStyle(conforma, policyRepo, $offsetX="-40", $offsetY="100")
-    UpdateRelStyle(ecWrapper, oidc, $offsetX="30", $offsetY="40")
+    UpdateRelStyle(conformaWrapper, oidc, $offsetX="30", $offsetY="40")
 
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
@@ -188,13 +188,13 @@ C4Container
 
 ```mermaid
 C4Component
-    title EC Validation Module - Component Diagram
+    title Policy Validation Module - Component Diagram
 
     Deployment_Node(trustifySystem, "Trustify System") {
         Container(api, "API Gateway", "Actix-web", "REST API for EC operations")
-        Container_Boundary(ecModule, "EC Validation Module") {
-            Container(ecEndpoints, "EC Endpoints", "Actix-web handlers", "REST endpoints for validation operations")
-            Component(ecService, "Policy Verifier service", "Business logic", "Orchestrates validation workflow")
+        Container_Boundary(policyValidationModule, "Policy Validation Module") {
+            Container(policyEndpoints, "Policy Endpoints", "Actix-web handlers", "REST endpoints for validation operations")
+            Component(policyVeriferService, "Policy Verifier service", "Business logic", "Orchestrates validation workflow")
             Component(resultParser, "Result Parser", "JSON parser", "Parses Conforma output into structured data")
             Component(policyManager, "Policy Manager", "Business logic", "Manages EC policy references and<br/>configuration")
             Component(resultPersistence, "Result Persistence", "Database layer", "Saves validation results")
@@ -202,7 +202,7 @@ C4Component
     }
     Deployment_Node(external, "External System") {
         Deployment_Node(trustifyPod, "Trustify Pod") {
-            Component(ecWrapper, "Conforma Wrapper", "Actix-web handlers", "HTTP API")
+            Component(conformaWrapper, "Conforma Wrapper", "Actix-web handlers", "HTTP API")
         }
         Deployment_Node(conformaPod, "Conforma Pod") {
             System_Ext(conforma, "Conforma CLI", "Enterprise Contract validation tool")
@@ -216,24 +216,24 @@ C4Component
         System_Ext(s3, "S3 Object Storage", "Stores SBOM documents and reports")
     }
 
-    Rel(api, ecEndpoints, "POST /ec/validate,\nGET /ec/report", "JSON/HTTPS")
-    Rel(ecEndpoints, ecService, "validate_sbom() / get_ec_report()", "Function call")
-    Rel(ecService, policyManager, "get_policy_config()", "Function call")
+    Rel(api, policyEndpoints, "POST /ec/validate,\nGET /ec/report", "JSON/HTTPS")
+    Rel(policyEndpoints, policyVeriferService, "validate_sbom() / get_ec_report()", "Function call")
+    Rel(policyVeriferService, policyManager, "get_policy_config()", "Function call")
     Rel(policyManager, postgres, "SELECT policy", "SQL")
-    Rel(ecService, ecWrapper, "POST /api/v1/validation → returns {id}", "HTTP")
-    Rel(ecWrapper, conforma, "ec validate", "Process spawn")
-    Rel(ecWrapper, api, "POST /api/v2/ec/validation/{validation_id}/result", "JSON/HTTPS")
-    Rel(ecService, resultParser, "parse_output()", "Function call")
-    Rel(ecService, resultPersistence, "save_results()", "Function call")
+    Rel(policyVeriferService, conformaWrapper, "POST /api/v1/validation → returns {id}", "HTTP")
+    Rel(conformaWrapper, conforma, "ec validate", "Process spawn")
+    Rel(conformaWrapper, api, "POST /api/v2/ec/validation/{validation_id}/result", "JSON/HTTPS")
+    Rel(policyVeriferService, resultParser, "parse_output()", "Function call")
+    Rel(policyVeriferService, resultPersistence, "save_results()", "Function call")
     Rel(resultPersistence, postgres, "INSERT policy_validation", "SQL")
-    Rel(ecService, s3, "Store EC report", "S3 API")
+    Rel(policyVeriferService, s3, "Store EC report", "S3 API")
 
-    UpdateRelStyle(api, ecEndpoints, $offsetX="-50", $offsetY="-50")
-    UpdateRelStyle(ecEndpoints, ecService, $offsetX="-60", $offsetY="+40")
-    UpdateRelStyle(ecService, ecWrapper, $offsetX="-20", $offsetY="10")
-    UpdateRelStyle(ecWrapper, api, $offsetX="20", $offsetY="-40")
-    UpdateRelStyle(ecService, resultParser, $offsetX="-60", $offsetY="+0")
-    UpdateRelStyle(ecService, resultPersistence, $offsetX="-60", $offsetY="+80")
+    UpdateRelStyle(api, policyEndpoints, $offsetX="-50", $offsetY="-50")
+    UpdateRelStyle(policyEndpoints, policyVeriferService, $offsetX="-60", $offsetY="+40")
+    UpdateRelStyle(policyVeriferService, conformaWrapper, $offsetX="-20", $offsetY="10")
+    UpdateRelStyle(conformaWrapper, api, $offsetX="20", $offsetY="-40")
+    UpdateRelStyle(policyVeriferService, resultParser, $offsetX="-60", $offsetY="+0")
+    UpdateRelStyle(policyVeriferService, resultPersistence, $offsetX="-60", $offsetY="+80")
 
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
@@ -245,7 +245,7 @@ sequenceDiagram
     autonumber
     actor User
     participant API as Trustify API
-    participant EP as EC Endpoints
+    participant EP as Policy Endpoints
     participant VS as Policy Verifier service
     participant PM as Policy Manager
     participant DB as PostgreSQL
@@ -296,7 +296,7 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant API as Trustify API
-    participant EP as EC Endpoints
+    participant EP as Policy Endpoints
     participant VS as Policy Verifier service
     participant DB as PostgreSQL
     participant S3 as Object Storage
@@ -475,12 +475,12 @@ GET    /api/v2/policy/{id}               # Get policy reference
 PUT    /api/v2/policy/{id}               # Update policy reference (admin)
 DELETE /api/v2/policy/{id}               # Delete policy reference (admin)
 
-POST   /api/v2/policy/validate                                    # Trigger validation (multipart form: sbom_id, policy_id)
-GET    /api/v2/policy/report?sbom_id={id}&policy_id={id}          # Get latest validation result
-GET    /api/v2/policy/report/history?sbom_id={id}&policy_id={id}  # Get validation history
-GET    /api/v2/policy/report/{result_id}                          # Download detailed report from S3
+POST   /api/v2/policy/validate                                   # Trigger validation (multipart form: sbom_id, policy_id)
+GET    /api/v2/policy/report?sbom_id={id}&policy_id={id}         # Get latest validation result
+GET    /api/v2/policy/report/history?sbom_id={id}&policy_id={id} # Get validation history
+GET    /api/v2/policy/report/{result_id}                         # Download detailed report from S3
 
-POST   /api/v2/ec/validation/{validation_id}/result       # Callback: Conforma Wrapper posts Conforma result
+POST   /api/v2/policy/validation/{validation_id}/result          # Callback: Conforma Wrapper posts Conforma result
 ```
 
 ## Conforma Wrapper API Endpoints
