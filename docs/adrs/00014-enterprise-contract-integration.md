@@ -54,7 +54,7 @@ The `processing_status` "In Progress" state serves as a concurrency guard: if a 
 What is stored where
 
 - PostgreSQL: validation process state (`processing_status`), validation outcome (`status`), structured results (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, processing_status, status, start_time.
-- Storage system: full raw Conforma JSON report, linked from the DB row via report_path. Keeps DB rows small while preserving audit completeness.
+- Storage system: full raw Conforma JSON report, linked from the DB row via `source_document.id`. Keeps DB rows small while preserving audit completeness.
 - Not stored: the policy definitions themselves. policy stores references (URLs, OCI refs) that Conforma fetches at runtime.
 
 Storing full JSON in storage system rather than only a summary was chosen explicitly to preserve audit completeness — callers can always fetch the raw report. The DB results JSONB holds enough structure for filtering and dashboards without duplicating the full payload.
@@ -329,11 +329,11 @@ sequenceDiagram
     alt Pass
         VS->>DB: UPDATE policy_validation SET verification_status='completed', status='pass', results=[]
         VS->>S3: store_validation_report(result_id, full_json)
-        VS->>DB: UPDATE SET report_path = ?
+        VS->>DB: UPDATE SET source_document.id = ?
     else Fail
         VS->>DB: UPDATE policy_validation SET verification_status='completed', status='fail', results=json
         VS->>S3: store_validation_report(result_id, full_json)
-        VS->>DB: UPDATE SET report_path = ?
+        VS->>DB: UPDATE SET source_document.id = ?
     else Error
         VS->>DB: UPDATE policy_validation SET verification_status='failed', status='error', error_message=detail
         Note over VS,DB: Validation can be re-triggered (new row with processing_status='in_progress', status='pending')
@@ -391,7 +391,7 @@ sequenceDiagram
 - `verification_status` (ENUM) - 'pending', 'pass', 'fail', 'error'
 - `results` (JSONB) - See model below
 - `summary` (JSONB) - Total checks, passed, failed, warnings, see model below
-- `report_path` (VARCHAR) - File system or S3 path to detailed report
+- `source_document_id` (VARCHAR) - File system or S3 path to detailed report
 - `start_time` (TIMESTAMP)
 - `end_time` (TIMESTAMP)
 - `policy_version` (VARCHAR) - Policy commit hash or tag resolved at validation time
