@@ -27,7 +27,6 @@ Users need the ability to:
 
 We will integrate Conforma into Trustify as a user triggered validation service by interacting with Conforma CLI.  
 Validation is manually triggered — not automatic on SBOM upload.  
-Validation on upload is deferred to a follow-up version.
 Trustify stores information to identify (id, name, URL) of Policies.
 A default Policy is defined at the application level (global policy) which is used for validation when an SBOM does not have any Policy explicitly attached to it.
 
@@ -61,6 +60,8 @@ What is stored where
 Storing full JSON in storage system rather than only a summary was chosen explicitly to preserve audit completeness — callers can always fetch the raw report. The DB results JSONB holds enough structure for filtering and dashboards without duplicating the full payload.
 
 ### Futur work
+
+#### Validation on SBOM upload
 
 #### Multi-tenancy
 
