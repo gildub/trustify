@@ -435,15 +435,15 @@ sequenceDiagram
 
 **`policy_validation.summary` JSONB model:**
 
-| Field            | Type    | Required | Description                                                              |
-| ---------------- | ------- | -------- | ------------------------------------------------------------------------ |
-| `success`        | boolean | yes      | Overall pass/fail outcome (mirrors Conforma's top-level `success` field) |
-| `total`          | integer | yes      | Total number of checks evaluated                                         |
-| `violations`     | integer | yes      | Count of checks with violation severity                                  |
-| `warnings`       | integer | yes      | Count of checks with warning severity                                    |
-| `successes`      | integer | yes      | Count of checks that passed                                              |
-| `ec_version`     | string  | yes      | Conforma version used (e.g. `"v0.8.83"`)                                 |
-| `effective_time` | string  | yes      | ISO 8601 timestamp of evaluation provided by Conforma                    |
+| Field              | Type    | Required | Description                                                              |
+| ------------------ | ------- | -------- | ------------------------------------------------------------------------ |
+| `success`          | boolean | yes      | Overall pass/fail outcome (mirrors Conforma's top-level `success` field) |
+| `total`            | integer | yes      | Total number of checks evaluated                                         |
+| `violations`       | integer | yes      | Count of checks with violation severity                                  |
+| `warnings`         | integer | yes      | Count of checks with warning severity                                    |
+| `successes`        | integer | yes      | Count of checks that passed                                              |
+| `conforma_version` | string  | yes      | Conforma version used (e.g. `"v0.8.83"`)                                 |
+| `effective_time`   | string  | yes      | ISO 8601 timestamp of evaluation provided by Conforma                    |
 
 `policy_validation.summary` example:
 
@@ -454,7 +454,7 @@ sequenceDiagram
   "violations": 1,
   "warnings": 1,
   "successes": 1,
-  "ec_version": "v0.8.83",
+  "conforma_version": "v0.8.83",
   "effective_time": "2026-03-03T14:36:55.807826709Z"
 }
 ```
