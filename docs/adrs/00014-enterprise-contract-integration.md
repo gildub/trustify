@@ -475,7 +475,7 @@ GET    /api/v2/policy/{id}               # Get policy reference
 PUT    /api/v2/policy/{id}               # Update policy reference (admin)
 DELETE /api/v2/policy/{id}               # Delete policy reference (admin)
 
-POST   /api/v2/policy/validate                                   # Trigger validation (multipart form: sbom_id, policy_id)
+POST   /api/v2/policy/validate?sbom_id={id}&policy_id={id}       # Trigger validation
 GET    /api/v2/policy/report?sbom_id={id}&policy_id={id}         # Get latest validation result
 GET    /api/v2/policy/report/history?sbom_id={id}&policy_id={id} # Get validation history
 GET    /api/v2/policy/report/{result_id}                         # Download detailed report from S3
