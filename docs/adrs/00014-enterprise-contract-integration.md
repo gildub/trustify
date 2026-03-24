@@ -66,6 +66,10 @@ Storing full JSON in storage system rather than only a summary was chosen explic
 
 Policy references are global (shared across all users) in this initial implementation. Per-organization policy namespacing is out of scope here and should be addressed in a dedicated multi-tenancy ADR when Trustify adds org-level isolation more broadly.
 
+#### Receive actionable feedback on policy violations
+
+This is out of scope of this ADR.
+
 ## Consequences
 
 ### The Conforma Wrapper runs externally
