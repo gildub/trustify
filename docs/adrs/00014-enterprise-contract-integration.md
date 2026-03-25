@@ -378,7 +378,13 @@ sequenceDiagram
 - `processing_status` (ENUM) - 'queued', 'in_progress', 'completed', 'failed'
 - `verification_status` (ENUM) - 'pending', 'pass', 'fail', 'error'
 - `results` (JSONB) - See model below
-- `summary` (JSONB) - Total checks, passed, failed, warnings, see model below
+- `success` (BOOLEAN) - Overall pass/fail outcome (mirrors Conforma's top-level `success` field)
+- `total` (SMALLINT) - Total number of checks evaluated
+- `violations` (SMALLINT) - Count of checks with violation severity
+- `warnings` (SMALLINT) - Count of checks with warning severity
+- `successes` (SMALLINT) - Count of checks that passed
+- `conforma_version`(VARCHAR) - Conforma version used (e.g. `"v0.8.83"`)
+- `effective_time` (VARCHAR) - ISO 8601 timestamp of evaluation provided by Conforma
 - `source_document_id` (VARCHAR) - File system or S3 path to detailed report
 - `start_time` (TIMESTAMP)
 - `end_time` (TIMESTAMP)
