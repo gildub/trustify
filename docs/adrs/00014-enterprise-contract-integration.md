@@ -508,17 +508,13 @@ modules/policy/
     │   ├── executor.rs         # Conforma Wrapper HTTP client (adapter)
     │   └── result_parser.rs    # Output parsing
     └── error.rs                # Error types
-```
-
-### Conforma Wrapper Module Structure
-
-```
-├── Cargo.toml
-└── server
-    ├── lib.rs
-    ├── endpoints/
-    │   └── mod.rs              # REST endpoints
-    └── error.rs                # Error types
+└── conforma_wrapper
+    ├── build.rs
+    ├── Cargo.toml
+    └── src/
+        ├── endpoints/
+        │   └── mod.rs          # REST endpoints
+        └── lib.rs
 ```
 
 ### Technical Considerations
@@ -537,7 +533,9 @@ On the Conforma Wrapper side, concurrent Conforma processes are bounded by a sem
 
 #### Policy Management
 
-policy stores external references only. Conforma fetches the actual policy at validation time, which means Trustify does not cache policy content by default. The trade-off: validation always uses the latest policy version, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the configuration JSONB column and will be encrypted using AES crate; they are never logged.
+`policy` stores external references only as the policy is fetched by Conforma at validation time, therefore Trustify does not cache policy content.
+
+The trade-off: validation always uses the latest policy version, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the configuration JSONB column and will be encrypted using AES crate; they are never logged.
 
 The policy commit hash/tag (`policy_version`) resolved at validation time are recorded in each result row, enabling reproducibility and audit.
 
