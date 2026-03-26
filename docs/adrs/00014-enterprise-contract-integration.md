@@ -488,7 +488,7 @@ POST   /api/v2/policy/validation/{validation_id}/result          # Callback: Con
 POST   /api/v1/validate                     # Validate uploaded SBOM file against the provided Policy URL (multipart form)
 ```
 
-### Trustify Module Structure
+### Trustify File Structure
 
 ```
 modules/policy/
