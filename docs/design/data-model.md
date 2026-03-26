@@ -385,19 +385,19 @@ erDiagram
     sbom ||--o{ sbom_node : "contains"
     sbom ||--o{ sbom_package : "has_packages"
     sbom ||--o{ sbom_file : "has_files"
-    sbom ||--o{ sbom_node_checksum : "has_checksums"
-    sbom ||--o{ sbom_external_node : "references_external"
-    sbom ||--o{ sbom_external_node : "referenced_by"
-    sbom ||--o{ package_relates_to_package : "defines_relationships"
     sbom ||--o{ purl_license_assertion : "asserts_purl_license"
     sbom ||--o{ cpe_license_assertion : "asserts_cpe_license"
     sbom ||--o{ product_version : "documents"
 
     sbom_node ||--o| sbom_package : "is_package"
+    sbom_node ||--o{ sbom_node_checksum : "has_checksums"
     sbom_node ||--o| sbom_file : "is_file"
+    sbom_node ||--o{ sbom_external_node : "referenced_by"
+    sbom_node ||--o{ sbom_external_node : "references_external"
 
     sbom_package ||--o{ sbom_package_purl_ref : "identified_by_purl"
     sbom_package ||--o{ sbom_package_cpe_ref : "identified_by_cpe"
+    sbom_package ||--o{ package_relates_to_package : "defines_relationships"
 
     relationship ||--o{ package_relates_to_package : "typed_by"
 
