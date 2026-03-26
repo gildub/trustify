@@ -493,22 +493,22 @@ POST   /api/v1/validate                     # Validate uploaded SBOM file agains
 ```
 modules/policy/
 ├── Cargo.toml
-└── src/
-    ├── error.rs                # Error types
-    ├── lib.rs
-    ├── endpoints/
-    │   └── mod.rs              # REST endpoints
-    ├── model/
-    │   ├── mod.rs
-    │   ├── policy.rs           # Policy API models
-    │   └── validation.rs       # Validation result models
-    ├── service/
-    │   ├── mod.rs
-    │   ├── ec_service.rs       # Main orchestration
-    │   ├── policy_manager.rs   # Policy configuration
-    │   └── result_parser.rs    # Output parsing
-    └── client/
-        └── conforma.rs         # Conforma client adapter
+├── src/
+│   ├── error.rs                # Error types
+│   ├── lib.rs
+│   ├── endpoints/
+│   │   └── mod.rs              # REST endpoints
+│   ├── model/
+│   │   ├── mod.rs
+│   │   ├── policy.rs           # Policy API models
+│   │   └── validation.rs       # Validation result models
+│   ├── service/
+│   │   ├── mod.rs
+│   │   ├── ec_service.rs       # Main orchestration
+│   │   ├── policy_manager.rs   # Policy configuration
+│   │   └── result_parser.rs    # Output parsing
+│   └── client/
+│        └── conforma.rs         # Conforma client adapter
 └── conforma_wrapper
     ├── build.rs
     ├── Cargo.toml
