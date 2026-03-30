@@ -390,8 +390,6 @@ sequenceDiagram
 - `results` (JSONB) - See model below
 - `summary` (JSONB) - Total checks, passed, failed, warnings, see model below
 - `source_document_id` (VARCHAR) - File system or S3 path to detailed report
-- `start_time` (TIMESTAMP)
-- `end_time` (TIMESTAMP)
 - `error_message` (TEXT) - Populated only on error status
 
 **`policy_validation.results` JSONB model:**
