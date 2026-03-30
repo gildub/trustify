@@ -40,7 +40,17 @@ The validation process state of the Conforma Wrapper follows this lifecycle:
 - **Queued** — a user has triggered validation; the request is being processed. Other users can see this state, preventing duplicate validation runs for the same SBOM + policy pair.
 - **In Progress** — the request has been submitted to Conforma Wrapper.
 - **Completed** — the outcome of the request has been received back from Conforma Wrapper.
-- **Failed** — an execution error occurred (CLI crash, policy fetch failure, timeout). The error is surfaced separately, and the validation can be re-triggered.
+- **Failed** — an execution error occurred (CLI crash, policy fetch failure, timeout). This is a terminal state; the error is surfaced to the user, who may manually queue a new validation run.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Queued : User triggers validation
+    Queued --> InProgress : Request submitted to\nConforma Wrapper
+    InProgress --> Completed : Outcome received
+    InProgress --> Failed : Execution error\n(crash, timeout, fetch failure)
+    Completed --> [*]
+    Failed --> [*]
+```
 
 The Policy validation outcome follows this lifecycle:
 
@@ -68,7 +78,7 @@ A dedicated Conforma Wrapper running alonside EC instance (Conforma CLI, etc) pr
 
 - **Resource isolation** — A long-running or memory-heavy Conforma process cannot degrade Trustify's responsiveness.
 - **Independent scaling** — The Conforma Wrapper can be scaled horizontally (more replicas) based on validation demand without scaling the entire Trustify deployment. Conversely, Trustify can scale for query load without provisioning excess capacity for validation.
-- **Failure containment** — An EC instance crash (OOM kill, policy fetch timeout, unexpected CLI error) is isolated to the wrapper. Trustify records the failure in `processing_status` and remains fully operational; the validation can be re-triggered.
+- **Failure containment** — An EC instance crash (OOM kill, policy fetch timeout, unexpected CLI error) is isolated to the wrapper. Trustify records the failure as a terminal `processing_status` and remains fully operational; the user may manually queue a new validation.
 - **Version independence** — The Conforma Wrapper and EC instance (Conforma CLI) can be upgraded or rolled back on their own release cadence, without redeploying Trustify. This is important given Conforma's active development pace.
 
 The trade-off is added infrastructure complexity: the Conforma Wrapper must be deployed separatly with EC instance, monitored, and maintained as a separate component alongside the Conforma CLI binary.
@@ -324,7 +334,7 @@ sequenceDiagram
         VS->>DB: UPDATE SET source_document.id = ?
     else Error
         VS->>DB: UPDATE policy_validation SET verification_status='failed', status='error', error_message=detail
-        Note over VS,DB: Validation can be re-triggered (new row with processing_status='in_progress', status='pending')
+        Note over VS,DB: Failed is terminal. User may manually queue a new validation (new row).
     end
 ```
 
@@ -908,7 +918,12 @@ Exit codes are treated as follows: 0 = pass, 1 = policy violations (expected fai
 
 #### Concurrency and Backpressure
 
-On the Conforma Wrapper side, concurrent Conforma processes are bounded by a semaphore (default: 5). When the semaphore is exhausted, the Conforma Wrapper returns 429 Too Many Requests to Trustify, which propagates the status to the caller. This makes the capacity limit explicit to callers (e.g., CI pipelines can implement their own retry with backoff). On the Trustify side, the `processing_status` "In Progress" concurrency guard (409 Conflict) prevents duplicate validation runs for the same SBOM + policy pair. If demand grows to warrant it, a proper queue (Redis/RabbitMQ) is the deferred alternative considered below.
+Concurrency is controlled at two levels:
+
+- **Trustify (duplicate prevention)** — Before forwarding a request to the Conforma Wrapper, the Policy Verifier service checks whether a validation is already queued or in progress for the same SBOM + policy pair. If one exists, the request is rejected with 409 Conflict, preventing duplicate work.
+- **Conforma Wrapper (resource protection)** — Concurrent Conforma CLI processes are bounded by a semaphore (default: 5). When the semaphore is exhausted, the Wrapper returns 429 Too Many Requests, which Trustify propagates to the caller. This makes the capacity limit explicit so that callers (e.g., CI pipelines) can implement their own retry with backoff.
+
+If demand grows beyond what the semaphore-based approach can handle, a proper queue (Redis/RabbitMQ) is a deferred alternative (see _Batch Processing Queue_ in Alternatives Considered above).
 
 #### Policy Management
 
