@@ -353,7 +353,7 @@ sequenceDiagram
 
 | Field                  | Type     | Required        | Description                                                                      |
 | ---------------------- | -------- | --------------- | -------------------------------------------------------------------------------- |
-| `policy_ref`           | string   | yes             | Policy source URL, e.g. `"git://github.com/org/policy-repo?ref=main"`            |
+| `policy_ref`           | string   | yes             | Policy source URL, e.g. `"git://[URL]?ref=[BRANCH OR TAG]"`                      |
 | `auth`                 | object   | no              | Credentials for private repos; sensitive values encrypted via AES (never logged) |
 | `auth.type`            | string   | yes (if `auth`) | `"token"`, `"ssh_key"`, or `"none"`                                              |
 | `auth.token_encrypted` | string   | no              | AES-encrypted bearer/PAT token, prefixed with encryption scheme                  |
@@ -398,7 +398,6 @@ sequenceDiagram
 - `source_document_id` (VARCHAR) - File system or S3 path to detailed report
 - `start_time` (TIMESTAMP)
 - `end_time` (TIMESTAMP)
-- `policy_version` (VARCHAR) - Policy commit hash or tag resolved at validation time
 - `error_message` (TEXT) - Populated only on error status
 
 **`policy_validation.results` JSONB model:**
@@ -458,7 +457,7 @@ sequenceDiagram
 | `violations`       | integer | yes      | Count of checks with violation severity                                  |
 | `warnings`         | integer | yes      | Count of checks with warning severity                                    |
 | `successes`        | integer | yes      | Count of checks that passed                                              |
-| `conforma_version` | string  | yes      | Conforma version used (e.g. `"v0.8.83"`)                                 |
+| `conforma_version` | string  | yes      | Version of Conforma CLI (e.g. `"v0.8.83"`)                               |
 | `effective_time`   | string  | yes      | ISO 8601 timestamp of evaluation provided by Conforma                    |
 
 `policy_validation.summary` example:
@@ -927,11 +926,14 @@ If demand grows beyond what the semaphore-based approach can handle, a proper qu
 
 #### Policy Management
 
-`policy` stores external references only as the policy is fetched by Conforma at validation time, therefore Trustify does not cache policy content.
+When the policy.policy_type is "Conforma", the initial only policy type supported, the `policy` is using external references only and therefore Trustify does not cache policy content.
 
-The trade-off: validation always uses the latest policy version, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the configuration JSONB column and will be encrypted using AES crate; they are never logged.
+Conforma fetches the policy at validation time from the git source specified in `policy.configuration.policy_ref`.
 
-The policy commit hash/tag (`policy_version`) resolved at validation time are recorded in each result row, enabling reproducibility and audit.
+The trade-off: validation always uses the latest policy content from the referenced branch or tag, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the `configuration` JSONB column and encrypted using the AES crate; they are never logged.
+
+The `policy_validation.policy_version` field records the policy commit hash or tag resolved from the `policy_ref` git source at validation time, enabling reproducibility and audit.
+`policy_validation.conforma_version`, which tracks the Conforma CLI tool version number (e.g., `v0.8.83`).
 
 ### Futur work
 
