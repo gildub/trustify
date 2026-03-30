@@ -465,28 +465,302 @@ sequenceDiagram
 }
 ```
 
-### Trustify API Endpoints
+### POST `/api/v2/policy`
 
-```
-POST   /api/v2/policy                    # Create policy reference (admin)
-GET    /api/v2/policy                    # List policy references
-GET    /api/v2/policy/{id}               # Get policy reference
-PUT    /api/v2/policy/{id}               # Update policy reference (admin)
-DELETE /api/v2/policy/{id}               # Delete policy reference (admin)
+Create a new policy reference.
 
-POST   /api/v2/policy/validate?sbom_id={id}&policy_id={id}       # Trigger validation
-GET    /api/v2/policy/report?sbom_id={id}&policy_id={id}         # Get latest validation result
-GET    /api/v2/policy/report/history?sbom_id={id}&policy_id={id} # Get validation history
-GET    /api/v2/policy/report/{result_id}                         # Download detailed report from S3
+#### Request
 
-POST   /api/v2/policy/validation/{validation_id}/result          # Callback: Conforma Wrapper posts Conforma result
-```
+| part | name | type            | description |
+| ---- | ---- | --------------- | ----------- |
+| body | -    | `PolicyRequest` |             |
+
+#### Response
+
+- 201 - the policy was created
+
+  ```yaml
+  id: <id> # ID of the created policy
+  ```
+
+  And:
+
+  ```
+  Location: /api/v2/policy/<id>
+  ```
+
+- 400 - if the request could not be understood
+- 401 - if the user was not authenticated
+- 403 - if the user was authenticated but not authorized
+- 409 - if a policy with the same name already exists
+
+### GET `/api/v2/policy`
+
+List policy references, optionally filtered.
+
+By default, the entries will be sorted by name ascending.
+
+#### Request
+
+| part  | name     | type       | description                                             |
+| ----- | -------- | ---------- | ------------------------------------------------------- |
+| query | `q`      | "q" string | "q style" query string                                  |
+| query | `limit`  | u64        | Maximum number of items to return                       |
+| query | `offset` | u64        | Initial items to skip before actually returning results |
+
+The following `q` parameters are supported:
+
+- `name`: Filters policies by their name.
+
+#### Response
+
+- 200 - if the user is allowed to read policies
+
+  ```rust
+  #[derive(Serialize, Deserialize)]
+  struct PaginatedPolicy {
+      total: u64,
+      items: Vec<Policy>,
+  }
+  ```
+
+- 401 - if the user was not authenticated
+- 403 - if the user was authenticated but not authorized
+
+### GET `/api/v2/policy/{id}`
+
+Get a single policy reference by ID.
+
+#### Request
+
+| part | name | type     | description             |
+| ---- | ---- | -------- | ----------------------- |
+| path | `id` | `String` | ID of the policy to get |
+
+#### Response
+
+- 200 - if the policy was found
+
+  | part    | name   | type     | description                        |
+  | ------- | ------ | -------- | ---------------------------------- |
+  | body    | -      | `Policy` | The policy information             |
+  | headers | `ETag` | string   | Value which indicates the revision |
+
+- 401 - if the user was not authenticated
+- 404 - if the policy was not found or the user doesn't have permission to read this policy
+
+### PUT `/api/v2/policy/{id}`
+
+Update an existing policy reference.
+
+#### Request
+
+| part   | name      | type             | description                    |
+| ------ | --------- | ---------------- | ------------------------------ |
+| path   | `id`      | `String`         | ID of the policy to update     |
+| header | `IfMatch` | `Option<String>` | ETag value, revision to update |
+| body   | -         | `PolicyRequest`  | The new content                |
+
+#### Response
+
+- 204 - the policy was updated
+- 400 - if the request could not be understood
+- 401 - if the user was not authenticated
+- 403 - if the user was authenticated but not authorized
+- 404 - if the policy was not found
+- 409 - if a policy with the same name already exists
+- 412 - if the `IfMatch` header was present, but its value didn't match the stored revision
+
+### DELETE `/api/v2/policy/{id}`
+
+Delete an existing policy reference.
+
+Deleting a policy will fail if there are validation results referencing it.
+
+#### Request
+
+| part   | name      | type             | description                    |
+| ------ | --------- | ---------------- | ------------------------------ |
+| path   | `id`      | `String`         | ID of the policy to delete     |
+| header | `IfMatch` | `Option<String>` | ETag value, revision to delete |
+
+#### Response
+
+- 204 - if the policy was successfully deleted
+- 204 - if the policy was already deleted
+- 400 - if the request could not be understood
+- 401 - if the user was not authenticated
+- 403 - if the user was authenticated but not authorized
+- 409 - if the policy has associated validation results
+- 412 - if the `IfMatch` header was present, but its value didn't match the stored revision
+
+### POST `/api/v2/policy/validate`
+
+Trigger a policy validation for a given SBOM and policy pair. The validation is performed asynchronously by the Conforma Wrapper; a `validation_id` is returned immediately.
+
+If a validation is already in progress for the same SBOM + policy pair, the request is rejected with 409 Conflict.
+
+#### Request
+
+| part  | name        | type     | description                                                       |
+| ----- | ----------- | -------- | ----------------------------------------------------------------- |
+| query | `sbom_id`   | `String` | ID of the SBOM to validate                                        |
+| query | `policy_id` | `String` | ID of the policy to validate against (omit to use default policy) |
+
+#### Response
+
+- 202 - the validation was accepted and queued
+
+  ```rust
+  #[derive(Serialize, Deserialize)]
+  struct ValidationAccepted {
+      validation_id: Uuid,
+  }
+  ```
+
+- 400 - if the request could not be understood
+- 401 - if the user was not authenticated
+- 403 - if the user was authenticated but not authorized
+- 404 - if the SBOM or policy was not found
+- 409 - if a validation is already in progress for this SBOM + policy pair
+- 429 - if the Conforma Wrapper has reached its concurrency limit
+
+### GET `/api/v2/policy/report`
+
+Get the latest validation result for a given SBOM and policy pair.
+
+#### Request
+
+| part  | name        | type     | description                                   |
+| ----- | ----------- | -------- | --------------------------------------------- |
+| query | `sbom_id`   | `String` | ID of the SBOM                                |
+| query | `policy_id` | `String` | ID of the policy (omit to use default policy) |
+
+#### Response
+
+- 200 - if a validation result exists
+
+  | part | name | type               | description                  |
+  | ---- | ---- | ------------------ | ---------------------------- |
+  | body | -    | `PolicyValidation` | The latest validation result |
+
+- 401 - if the user was not authenticated
+- 403 - if the user was authenticated but not authorized
+- 404 - if the SBOM or policy was not found, or no validation has been performed yet
+
+### GET `/api/v2/policy/report/history`
+
+Get the validation history for a given SBOM and policy pair, ordered by `start_time` descending.
+
+#### Request
+
+| part  | name        | type       | description                                             |
+| ----- | ----------- | ---------- | ------------------------------------------------------- |
+| query | `sbom_id`   | `String`   | ID of the SBOM                                          |
+| query | `policy_id` | `String`   | ID of the policy (omit to use default policy)           |
+| query | `q`         | "q" string | "q style" query string                                  |
+| query | `limit`     | u64        | Maximum number of items to return                       |
+| query | `offset`    | u64        | Initial items to skip before actually returning results |
+
+The following `q` parameters are supported:
+
+- `processing_status`: Filters by processing status (`queued`, `in_progress`, `completed`, `failed`).
+- `verification_status`: Filters by verification status (`pending`, `pass`, `fail`, `error`).
+
+#### Response
+
+- 200 - if the SBOM and policy exist
+
+  ```rust
+  #[derive(Serialize, Deserialize)]
+  struct PaginatedPolicyValidation {
+      total: u64,
+      items: Vec<PolicyValidation>,
+  }
+  ```
+
+- 401 - if the user was not authenticated
+- 403 - if the user was authenticated but not authorized
+- 404 - if the SBOM or policy was not found
+
+### GET `/api/v2/policy/report/{result_id}`
+
+Download the full raw Conforma JSON report from storage.
+
+#### Request
+
+| part | name        | type     | description                          |
+| ---- | ----------- | -------- | ------------------------------------ |
+| path | `result_id` | `String` | ID of the validation result to fetch |
+
+#### Response
+
+- 200 - if the report was found
+
+  | part    | name           | type     | description                   |
+  | ------- | -------------- | -------- | ----------------------------- |
+  | body    | -              | raw JSON | The full Conforma JSON report |
+  | headers | `Content-Type` | string   | `application/json`            |
+
+- 401 - if the user was not authenticated
+- 403 - if the user was authenticated but not authorized
+- 404 - if the validation result or report was not found
+
+### POST `/api/v2/policy/validation/{validation_id}/result`
+
+Callback endpoint used by the Conforma Wrapper to post the validation result back to Trustify after Conforma CLI execution completes.
+
+This endpoint is not intended for end-user use.
+
+#### Request
+
+| part | name            | type     | description                                         |
+| ---- | --------------- | -------- | --------------------------------------------------- |
+| path | `validation_id` | `String` | ID of the validation (returned in the 202 response) |
+| body | -               | raw JSON | The raw Conforma CLI JSON output                    |
+
+#### Response
+
+- 204 - the result was accepted and persisted
+- 400 - if the request could not be understood or the JSON is malformed
+- 401 - if the caller was not authenticated
+- 403 - if the caller was not authorized
+- 404 - if the validation ID was not found
+- 409 - if the validation already has a result (duplicate callback)
 
 ## Conforma Wrapper API Endpoints
 
 ```
 POST   /api/v1/validate                     # Validate uploaded SBOM file against the provided Policy URL (multipart form)
 ```
+
+### POST `/api/v1/validate`
+
+Accept an SBOM document and policy reference, spawn a Conforma CLI validation, and asynchronously post the result back to the Trustify callback endpoint.
+
+#### Request
+
+| part      | name           | type     | description                                                                |
+| --------- | -------------- | -------- | -------------------------------------------------------------------------- |
+| multipart | `sbom`         | file     | The SBOM document to validate (JSON or XML)                                |
+| multipart | `policy_ref`   | `String` | Policy source URL (e.g. `git://github.com/org/policy-repo?ref=main`)       |
+| multipart | `callback_url` | `String` | Trustify callback URL (`/api/v2/policy/validation/{validation_id}/result`) |
+| multipart | `extra_args`   | `String` | Additional CLI flags forwarded to Conforma (optional, JSON-encoded array)  |
+
+#### Response
+
+- 202 - the validation was accepted and will be processed asynchronously
+
+  ```rust
+  #[derive(Serialize, Deserialize)]
+  struct WrapperValidationAccepted {
+      validation_id: Uuid,
+  }
+  ```
+
+- 400 - if the request could not be understood or required fields are missing
+- 401 - if the caller was not authenticated
+- 429 - if the concurrency semaphore is exhausted (too many concurrent validations)
 
 ### Trustify File Structure
 
