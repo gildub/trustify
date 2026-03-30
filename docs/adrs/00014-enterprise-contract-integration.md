@@ -305,6 +305,7 @@ sequenceDiagram
     participant S3 as Object Storage
     participant Wrapper as Conforma Wrapper (HTTP)
     participant Conf as Conforma CLI
+    participant OIDC as OIDC Provider
 
     Note over Wrapper: Wrapper holds validation_id from the initial request
 
@@ -320,7 +321,9 @@ sequenceDiagram
     end
 
     Wrapper->>Wrapper: Cleanup temp files
-    Wrapper->>API: POST /api/v2/ec/validation/{validation_id}/result {conforma JSON output}
+    Wrapper->>OIDC: POST /token (grant_type=client_credentials, client_id, client_secret)
+    OIDC-->>Wrapper: {access_token, expires_in}
+    Wrapper->>API: POST /api/v2/ec/validation/{validation_id}/result {conforma JSON output}<br/>Authorization: Bearer <access_token>
     API->>EP: dispatch callback
     EP->>VS: process_validation_result(validation_id, result)
 
@@ -817,21 +820,22 @@ Download the full raw Conforma JSON report from storage.
 
 Callback endpoint used by the Conforma Wrapper to post the validation result back to Trustify after Conforma CLI execution completes.
 
-This endpoint is not intended for end-user use.
+This endpoint is not intended for end-user use. Because Trustify enforces OAuth 2.0 authentication on all API endpoints, the Conforma Wrapper must present a valid Bearer token obtained via the **OAuth 2.0 Client Credentials Grant** (see [Conforma Wrapper OIDC Configuration](#conforma-wrapper-oidc-configuration) below).
 
 #### Request
 
-| part | name            | type     | description                                         |
-| ---- | --------------- | -------- | --------------------------------------------------- |
-| path | `validation_id` | `String` | ID of the validation (returned in the 202 response) |
-| body | -               | raw JSON | The raw Conforma CLI JSON output                    |
+| part   | name            | type     | description                                                                            |
+| ------ | --------------- | -------- | -------------------------------------------------------------------------------------- |
+| path   | `validation_id` | `String` | ID of the validation (returned in the 202 response)                                    |
+| header | `Authorization` | `String` | `Bearer <access_token>` — token obtained from the OIDC provider via Client Credentials |
+| body   | -               | raw JSON | The raw Conforma CLI JSON output                                                       |
 
 #### Response
 
 - 204 - the result was accepted and persisted
 - 400 - if the request could not be understood or the JSON is malformed
-- 401 - if the caller was not authenticated
-- 403 - if the caller was not authorized
+- 401 - if the caller was not authenticated (missing or invalid Bearer token)
+- 403 - if the caller was not authorized (token lacks required scope/role)
 - 404 - if the validation ID was not found
 - 409 - if the validation already has a result (duplicate callback)
 
@@ -844,6 +848,8 @@ POST   /api/v1/validate                     # Validate uploaded SBOM file agains
 ### POST `/api/v1/validate`
 
 Accept an SBOM document and policy reference, spawn a Conforma CLI validation, and asynchronously post the result back to the Trustify callback endpoint.
+
+The Conforma Wrapper must be pre-configured with OIDC client credentials so it can authenticate to Trustify when posting results back (see [Conforma Wrapper OIDC Configuration](#conforma-wrapper-oidc-configuration)).
 
 #### Request
 
@@ -900,6 +906,28 @@ modules/policy/
 ```
 
 ### Technical Considerations
+
+#### Conforma Wrapper OIDC Configuration
+
+The Conforma Wrapper acts as a service client that must authenticate to Trustify when posting validation results back via the callback endpoint. It uses the **OAuth 2.0 Client Credentials Grant** — a standard machine-to-machine flow where the Wrapper exchanges its client credentials for an access token from the OIDC provider.
+
+The following environment variables (or equivalent configuration) must be set at deployment time:
+
+| Variable                          | Required | Description                                                                                         |
+| --------------------------------- | -------- | --------------------------------------------------------------------------------------------------- |
+| `TRUSTIFY_OIDC_TOKEN_ENDPOINT`    | yes      | OIDC token endpoint URL (e.g. `https://keycloak.example.com/realms/trustify/protocol/openid-connect/token`) |
+| `TRUSTIFY_OIDC_CLIENT_ID`         | yes      | Client ID registered in the OIDC provider for the Conforma Wrapper                                 |
+| `TRUSTIFY_OIDC_CLIENT_SECRET`     | yes      | Client secret for the registered client                                                             |
+| `TRUSTIFY_OIDC_SCOPE`             | no       | OAuth scope to request (defaults to provider default; set if Trustify requires a specific scope)    |
+
+**Token lifecycle**: The Wrapper should cache the access token and refresh it proactively before expiry (using the `expires_in` value from the token response). This avoids a token request on every callback and handles clock skew by refreshing with a safety margin (e.g. 30 seconds before expiry).
+
+**Failure handling**: If the token request fails (OIDC provider unreachable, invalid credentials), the Wrapper cannot deliver the callback. The validation remains in `in_progress` state until Trustify's timeout mechanism marks it as `failed`. The Wrapper should log the token acquisition error and may retry with exponential backoff before giving up.
+
+**Security considerations**:
+- The client secret must be stored securely (e.g. Kubernetes Secret, vault injection) and never logged.
+- The OIDC client should be registered with minimal scopes/roles — only the permission required to call the callback endpoint (`policy:write` or equivalent).
+- TLS is required for all OIDC token endpoint communication.
 
 #### Conforma CLI Execution
 
