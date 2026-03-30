@@ -63,7 +63,7 @@ The `processing_status` "In Progress" state serves as a concurrency guard: if a 
 
 What is stored where
 
-- PostgreSQL: validation process state (`processing_status`), validation outcome (`status`), structured results (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, processing_status, status, start_time.
+- PostgreSQL: validation process state (`processing_status`), validation outcome (`status`), structured results (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, processing_status.
 - Storage system: full raw Conforma JSON report, linked from the DB row via `source_document.id`. Keeps DB rows small while preserving audit completeness.
 - Not stored: the policy definitions themselves. policy stores references (URLs, OCI refs) that Conforma fetches at runtime.
 
@@ -517,7 +517,7 @@ struct PolicyConfiguration {
 ```
 
 ```rust
-/// Validation result summary returned by the API
+/// Validation result returned by the API
 #[derive(Serialize, Deserialize)]
 struct PolicyValidation {
     id: Uuid,
@@ -526,30 +526,27 @@ struct PolicyValidation {
     processing_status: String,
     verification_status: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    success: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    total: Option<u16>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    violations: Option<u16>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    warnings: Option<u16>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    successes: Option<u16>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    conforma_version: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    effective_time: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     results: Option<Vec<PolicyValidationResult>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    summary: Option<PolicyValidationSummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     source_document_id: Option<String>,
-    start_time: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    end_time: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    policy_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     error_message: Option<String>,
+}
+```
+
+```rust
+/// Summary of a validation execution (stored as JSONB)
+#[derive(Serialize, Deserialize)]
+struct PolicyValidationSummary {
+    success: bool,
+    total: u16,
+    violations: u16,
+    warnings: u16,
+    successes: u16,
+    conforma_version: String,
+    effective_time: String,
 }
 ```
 
@@ -760,7 +757,7 @@ Get the latest validation result for a given SBOM and policy pair.
 
 ### GET `/api/v2/policy/report/history`
 
-Get the validation history for a given SBOM and policy pair, ordered by `start_time` descending.
+Get the validation history for a given SBOM and policy pair, ordered by `sbom_id` descending.
 
 #### Request
 
@@ -913,18 +910,19 @@ The Conforma Wrapper acts as a service client that must authenticate to Trustify
 
 The following environment variables (or equivalent configuration) must be set at deployment time:
 
-| Variable                          | Required | Description                                                                                         |
-| --------------------------------- | -------- | --------------------------------------------------------------------------------------------------- |
-| `TRUSTIFY_OIDC_TOKEN_ENDPOINT`    | yes      | OIDC token endpoint URL (e.g. `https://keycloak.example.com/realms/trustify/protocol/openid-connect/token`) |
-| `TRUSTIFY_OIDC_CLIENT_ID`         | yes      | Client ID registered in the OIDC provider for the Conforma Wrapper                                 |
-| `TRUSTIFY_OIDC_CLIENT_SECRET`     | yes      | Client secret for the registered client                                                             |
-| `TRUSTIFY_OIDC_SCOPE`             | no       | OAuth scope to request (defaults to provider default; set if Trustify requires a specific scope)    |
+| Variable                       | Required | Description                                                                                                 |
+| ------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `TRUSTIFY_OIDC_TOKEN_ENDPOINT` | yes      | OIDC token endpoint URL (e.g. `https://keycloak.example.com/realms/trustify/protocol/openid-connect/token`) |
+| `TRUSTIFY_OIDC_CLIENT_ID`      | yes      | Client ID registered in the OIDC provider for the Conforma Wrapper                                          |
+| `TRUSTIFY_OIDC_CLIENT_SECRET`  | yes      | Client secret for the registered client                                                                     |
+| `TRUSTIFY_OIDC_SCOPE`          | no       | OAuth scope to request (defaults to provider default; set if Trustify requires a specific scope)            |
 
 **Token lifecycle**: The Wrapper should cache the access token and refresh it proactively before expiry (using the `expires_in` value from the token response). This avoids a token request on every callback and handles clock skew by refreshing with a safety margin (e.g. 30 seconds before expiry).
 
 **Failure handling**: If the token request fails (OIDC provider unreachable, invalid credentials), the Wrapper cannot deliver the callback. The validation remains in `in_progress` state until Trustify's timeout mechanism marks it as `failed`. The Wrapper should log the token acquisition error and may retry with exponential backoff before giving up.
 
 **Security considerations**:
+
 - The client secret must be stored securely (e.g. Kubernetes Secret, vault injection) and never logged.
 - The OIDC client should be registered with minimal scopes/roles — only the permission required to call the callback endpoint (`policy:write` or equivalent).
 - TLS is required for all OIDC token endpoint communication.
@@ -953,7 +951,7 @@ Conforma fetches the policy at validation time from the git source specified in 
 The trade-off: validation always uses the latest policy content from the referenced branch or tag, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the `configuration` JSONB column and encrypted using the AES crate; they are never logged.
 
 The `policy_validation.policy_version` field records the policy commit hash or tag resolved from the `policy_ref` git source at validation time, enabling reproducibility and audit.
-`policy_validation.conforma_version`, which tracks the Conforma CLI tool version number (e.g., `v0.8.83`).
+`policy_validation.summary.onforma_version`, which tracks the Conforma CLI tool version number (e.g., `v0.8.83`).
 
 ### Futur work
 
