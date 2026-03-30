@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774536545306,
+  "lastUpdate": 1774849101292,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -15107,6 +15107,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 10,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "e116e983996dd878b2c1deea34162e5a34008f6b",
+          "message": "build(deps): bump convict from 6.2.4 to 6.2.5 in /docs/book\n\nBumps [convict](https://github.com/mozilla/node-convict) from 6.2.4 to 6.2.5.\n- [Changelog](https://github.com/mozilla/node-convict/blob/master/CHANGELOG.md)\n- [Commits](https://github.com/mozilla/node-convict/commits)\n\n---\nupdated-dependencies:\n- dependency-name: convict\n  dependency-version: 6.2.5\n  dependency-type: indirect\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>",
+          "timestamp": "2026-03-27T07:34:02Z",
+          "tree_id": "4b423d42d9387161c2ac3d7f9174427369eb4414",
+          "url": "https://github.com/gildub/trustify/commit/e116e983996dd878b2c1deea34162e5a34008f6b"
+        },
+        "date": 1774849100068,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
             "unit": "s"
           }
         ]
