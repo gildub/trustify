@@ -465,6 +465,112 @@ sequenceDiagram
 }
 ```
 
+#### Data Model Implementation
+
+```rust
+/// The policy reference information
+#[derive(Serialize, Deserialize)]
+struct Policy {
+    id: Uuid,
+    name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    policy_type: String,
+    configuration: PolicyConfiguration,
+}
+```
+
+```rust
+/// Policy information that can be mutated
+#[derive(Serialize, Deserialize)]
+struct PolicyRequest {
+    name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    policy_type: String,
+    configuration: PolicyConfiguration,
+}
+```
+
+```rust
+/// Policy configuration (stored as JSONB)
+#[derive(Serialize, Deserialize)]
+struct PolicyConfiguration {
+    policy_ref: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    auth: Option<PolicyAuth>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    policy_paths: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    exclude: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    include: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    timeout_seconds: Option<u32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    extra_args: Vec<String>,
+}
+```
+
+```rust
+/// Validation result summary returned by the API
+#[derive(Serialize, Deserialize)]
+struct PolicyValidation {
+    id: Uuid,
+    sbom_id: Uuid,
+    policy_id: Uuid,
+    processing_status: String,
+    verification_status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    success: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    total: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    violations: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    warnings: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    successes: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    conforma_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    effective_time: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    results: Option<Vec<PolicyValidationResult>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    source_document_id: Option<String>,
+    start_time: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    end_time: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    policy_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    error_message: Option<String>,
+}
+```
+
+```rust
+/// A single check result within a validation
+#[derive(Serialize, Deserialize)]
+struct PolicyValidationResult {
+    severity: String,
+    msg: String,
+    metadata: PolicyValidationResultMetadata,
+}
+```
+
+```rust
+#[derive(Serialize, Deserialize)]
+struct PolicyValidationResultMetadata {
+    code: String,
+    title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    solution: Option<String>,
+}
+```
+
 ### POST `/api/v2/policy`
 
 Create a new policy reference.
