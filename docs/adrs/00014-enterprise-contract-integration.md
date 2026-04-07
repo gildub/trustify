@@ -951,7 +951,7 @@ Conforma fetches the policy at validation time from the git source specified in 
 The trade-off: validation always uses the latest policy content from the referenced branch or tag, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the `configuration` JSONB column and encrypted using the AES crate; they are never logged.
 
 The `policy_validation.policy_version` field records the policy commit hash or tag resolved from the `policy_ref` git source at validation time, enabling reproducibility and audit.
-`policy_validation.summary.onforma_version`, which tracks the Conforma CLI tool version number (e.g., `v0.8.83`).
+`policy_validation.summary.conforma_version`, which tracks the Conforma CLI tool version number (e.g., `v0.8.83`).
 
 ### Futur work
 
