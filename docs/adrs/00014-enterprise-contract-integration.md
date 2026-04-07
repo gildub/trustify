@@ -72,7 +72,7 @@ The `processing_status` "In Progress" state serves as a concurrency guard: if a 
 
 The result of a Policy validation follows this lifecycle:
 
-- **Pending** — initial state, indicates no validation has been triggered yet for this SBOM against this policy.
+- **Null** — initial state, indicates no validation has been triggered yet for this SBOM against this policy.
 - **Fail** — Conforma validation found policy violations; violation details are linked.
 - **Pass** — Conforma validation succeeded; the SBOM satisfies the policy.
 - **Error** — The Conforma validation has generated an error.
@@ -336,15 +336,15 @@ sequenceDiagram
     EP->>VS: process_validation_result(validation_id, result)
 
     alt Pass
-        VS->>DB: UPDATE policy_validation SET verification_status='completed', status='pass', results=[]
+        VS->>DB: UPDATE policy_validation SET status='completed', result='pass', results=[]
         VS->>S3: store_validation_report(result_id, full_json)
         VS->>DB: UPDATE SET source_document.id = ?
     else Fail
-        VS->>DB: UPDATE policy_validation SET verification_status='completed', status='fail', results=json
+        VS->>DB: UPDATE policy_validation SET status='completed', result='fail', results=json
         VS->>S3: store_validation_report(result_id, full_json)
         VS->>DB: UPDATE SET source_document.id = ?
     else Error
-        VS->>DB: UPDATE policy_validation SET verification_status='failed', status='error', error_message=detail
+        VS->>DB: UPDATE policy_validation SET status='completed', result='error', error_message=detail
         Note over VS,DB: Failed is terminal. User may manually queue a new validation (new row).
     end
 ```
@@ -396,8 +396,8 @@ sequenceDiagram
 - `id` (UUID, PK)
 - `sbom_id` (UUID, FK → sbom)
 - `policy_id` (UUID, FK → policy)
-- `processing_status` (ENUM) - 'queued', 'in_progress', 'completed', 'failed'
-- `verification_status` (ENUM) - 'pending', 'pass', 'fail', 'error'
+- `processing_status` (ENUM) - 'null', 'queued', 'in_progress', 'completed', 'failed'
+- `result` (ENUM) - 'null', 'fail', 'pass' or 'error'
 - `results` (JSONB) - See model below
 - `summary` (JSONB) - Total checks, passed, failed, warnings, see model below
 - `source_document_id` (VARCHAR) - File system or S3 path to detailed report
@@ -531,8 +531,8 @@ struct PolicyValidation {
     id: Uuid,
     sbom_id: Uuid,
     policy_id: Uuid,
-    processing_status: String,
-    verification_status: String,
+    state: String,
+    result: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     results: Option<Vec<PolicyValidationResult>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -780,7 +780,7 @@ Get the validation history for a given SBOM and policy pair, ordered by `sbom_id
 The following `q` parameters are supported:
 
 - `processing_status`: Filters by processing status (`queued`, `in_progress`, `completed`, `failed`).
-- `verification_status`: Filters by verification status (`pending`, `pass`, `fail`, `error`).
+- `result`: Filters by verification status (`pending`, `pass`, `fail`, `error`).
 
 #### Response
 
