@@ -59,9 +59,9 @@ To track the progress of the external validation process through the Conforma HT
 ```mermaid
 stateDiagram-v2
     [*] --> Queued : User triggers validation
-    Queued --> InProgress : Request submitted to\nConforma Wrapper
+    Queued --> InProgress : Request submitted to <br/>Conforma Wrapper
     InProgress --> Completed : Outcome received
-    InProgress --> Failed : Execution error\n(crash, timeout, fetch failure)
+    InProgress --> Failed : Execution error<br/>(crash, timeout, fetch failure)
     Completed --> [*]
     Failed --> [*]
 ```
