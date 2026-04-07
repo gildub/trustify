@@ -40,7 +40,7 @@ Policy validation can be be very resource-intensive, especially for large SBOMs 
 
 - **Resource isolation** — A long-running or memory-heavy Conforma process cannot degrade Trustify's responsiveness.
 - **Independent scaling** — The Conforma Wrapper can be scaled horizontally (more replicas) based on validation demand without scaling the entire Trustify deployment. Conversely, Trustify can scale for query load without provisioning excess capacity for validation.
-- **Failure containment** — An EC instance crash (OOM kill, policy fetch timeout, unexpected CLI error) is isolated to the wrapper. Trustify records the failure as a terminal `processing_status` and remains fully operational; the user may manually queue a new validation.
+- **Failure containment** — An EC instance crash (OOM kill, policy fetch timeout, unexpected CLI error) is isolated to the wrapper. Trustify records the failure as a terminal `status` and remains fully operational; the user may manually queue a new validation.
 - **Version independence** — The Conforma Wrapper and EC instance (Conforma CLI) can be upgraded or rolled back on their own release cadence, without redeploying Trustify. This is important given Conforma's active development pace.
 
 ### Validation process state
@@ -66,7 +66,7 @@ stateDiagram-v2
     Failed --> [*]
 ```
 
-The `processing_status` "In Progress" state serves as a concurrency guard: if a validation is already running for a given SBOM + policy pair, subsequent requests are rejected (409 Conflict), preventing duplicate work.
+The "In Progress" state serves as a concurrency guard: if a validation is already running for a given SBOM + policy pair, subsequent requests are rejected (409 Conflict), preventing duplicate work.
 
 ### Policy validation state
 
@@ -79,7 +79,7 @@ The result of a Policy validation follows this lifecycle:
 
 ### What is stored where
 
-- PostgreSQL: validation process state (`processing_status`), validation outcome (`status`), structured results (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, processing_status.
+- PostgreSQL: validation process state (`status`), validation outcome (`status`), structured results (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, status.
 - Storage system: full raw Conforma JSON report, linked from the DB row via `source_document.id`. Keeps DB rows small while preserving audit completeness.
 - Not stored: the policy definitions themselves. policy stores references (URLs, OCI refs) that Conforma fetches at runtime.
 
@@ -282,7 +282,7 @@ sequenceDiagram
         EP-->>API: 404 Not Found
     end
 
-    VS->>DB: SELECT * FROM policy_validation WHERE sbom_id = ? AND policy_id = ? AND processing_status IN ('queued', 'in_progress')
+    VS->>DB: SELECT * FROM policy_validation WHERE sbom_id = ? AND policy_id = ? AND status IN ('queued', 'in_progress')
     alt Validation already in progress
         VS-->>EP: 409 Conflict {existing job_id}
         EP-->>API: 409 Conflict
@@ -295,7 +295,7 @@ sequenceDiagram
     VS->>Wrapper: POST /api/v1/validate {SBOM, policy_ref}
     Wrapper-->>VS: 202 Accepted {validation_id}
 
-    VS->>DB: INSERT policy_validation (processing_status='in_progress', status='pending', sbom_id, policy_id, validation_id, ...)
+    VS->>DB: INSERT policy_validation (status='in_progress', status='pending', sbom_id, policy_id, validation_id, ...)
     VS-->>EP: 202 Accepted {validation_id}
     EP-->>API: 202 Accepted {validation_id}
     API-->>User: 202 Accepted {validation_id}
@@ -396,7 +396,7 @@ sequenceDiagram
 - `id` (UUID, PK)
 - `sbom_id` (UUID, FK → sbom)
 - `policy_id` (UUID, FK → policy)
-- `processing_status` (ENUM) - 'null', 'queued', 'in_progress', 'completed', 'failed'
+- `status` (ENUM) - 'null', 'queued', 'in_progress', 'completed', 'failed'
 - `result` (ENUM) - 'null', 'fail', 'pass' or 'error'
 - `results` (JSONB) - See model below
 - `summary` (JSONB) - Total checks, passed, failed, warnings, see model below
@@ -779,7 +779,7 @@ Get the validation history for a given SBOM and policy pair, ordered by `sbom_id
 
 The following `q` parameters are supported:
 
-- `processing_status`: Filters by processing status (`queued`, `in_progress`, `completed`, `failed`).
+- `status`: Filters by processing status (`queued`, `in_progress`, `completed`, `failed`).
 - `result`: Filters by verification status (`pending`, `pass`, `fail`, `error`).
 
 #### Response
