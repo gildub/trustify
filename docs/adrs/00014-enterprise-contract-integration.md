@@ -31,11 +31,25 @@ Trustify stores information to identify (id, name, URL) of Policies.
 A default Policy is defined at the application level (global policy) which is used for validation when an SBOM does not have any Policy explicitly attached to it.
 
 Conforma CLI is deployed separately from Trustify as either a standalone container or equivalent.
-A Conforma Wrapper (HTTP service) acts as a proxy between Trustify's Policy Verifier service and Conforma CLI.
 
-Each SBOM + policy pair has two validation states .
+A Conforma Wrapper (HTTP service) will act as a proxy between Trustify's Policy Verifier service and Conforma CLI.
 
-The validation process state of the Conforma Wrapper follows this lifecycle:
+### The Conforma HTTP Wrapper
+
+Policy validation can be be very resource-intensive, especially for large SBOMs with thousands of packages, and it requires a dedicated environment and having the Conforma HTTP Wrapper running alongside the Conforma CLI provides :
+
+- **Resource isolation** — A long-running or memory-heavy Conforma process cannot degrade Trustify's responsiveness.
+- **Independent scaling** — The Conforma Wrapper can be scaled horizontally (more replicas) based on validation demand without scaling the entire Trustify deployment. Conversely, Trustify can scale for query load without provisioning excess capacity for validation.
+- **Failure containment** — An EC instance crash (OOM kill, policy fetch timeout, unexpected CLI error) is isolated to the wrapper. Trustify records the failure as a terminal `processing_status` and remains fully operational; the user may manually queue a new validation.
+- **Version independence** — The Conforma Wrapper and EC instance (Conforma CLI) can be upgraded or rolled back on their own release cadence, without redeploying Trustify. This is important given Conforma's active development pace.
+
+### Validation process state
+
+Each SBOM + policy pair has two validation states
+
+The validation process state of the
+
+To track the progress of the external validation process through the Conforma HTTP Wrapper, the following states are used :
 
 - **Queued** — a user has triggered validation; the request is being processed. Other users can see this state, preventing duplicate validation runs for the same SBOM + policy pair.
 - **In Progress** — the request has been submitted to Conforma Wrapper.
@@ -52,16 +66,18 @@ stateDiagram-v2
     Failed --> [*]
 ```
 
-The Policy validation outcome follows this lifecycle:
+The `processing_status` "In Progress" state serves as a concurrency guard: if a validation is already running for a given SBOM + policy pair, subsequent requests are rejected (409 Conflict), preventing duplicate work.
+
+### Policy validation state
+
+The result of a Policy validation follows this lifecycle:
 
 - **Pending** — initial state, indicates no validation has been triggered yet for this SBOM against this policy.
 - **Fail** — Conforma validation found policy violations; violation details are linked.
 - **Pass** — Conforma validation succeeded; the SBOM satisfies the policy.
 - **Error** — The Conforma validation has generated an error.
 
-The `processing_status` "In Progress" state serves as a concurrency guard: if a validation is already running for a given SBOM + policy pair, subsequent requests are rejected (409 Conflict), preventing duplicate work.
-
-What is stored where
+### What is stored where
 
 - PostgreSQL: validation process state (`processing_status`), validation outcome (`status`), structured results (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, processing_status.
 - Storage system: full raw Conforma JSON report, linked from the DB row via `source_document.id`. Keeps DB rows small while preserving audit completeness.
@@ -71,17 +87,9 @@ Storing full JSON in storage system rather than only a summary was chosen explic
 
 ## Consequences
 
-### The Conforma Wrapper runs externally
+### Conforma HTTP Wrapper
 
-EC validation can be be very resource-intensive (especially for large SBOMs with thousands of packages) and it should not compete with Trustify.
-A dedicated Conforma Wrapper running alonside EC instance (Conforma CLI, etc) provides :
-
-- **Resource isolation** — A long-running or memory-heavy Conforma process cannot degrade Trustify's responsiveness.
-- **Independent scaling** — The Conforma Wrapper can be scaled horizontally (more replicas) based on validation demand without scaling the entire Trustify deployment. Conversely, Trustify can scale for query load without provisioning excess capacity for validation.
-- **Failure containment** — An EC instance crash (OOM kill, policy fetch timeout, unexpected CLI error) is isolated to the wrapper. Trustify records the failure as a terminal `processing_status` and remains fully operational; the user may manually queue a new validation.
-- **Version independence** — The Conforma Wrapper and EC instance (Conforma CLI) can be upgraded or rolled back on their own release cadence, without redeploying Trustify. This is important given Conforma's active development pace.
-
-The trade-off is added infrastructure complexity: the Conforma Wrapper must be deployed separatly with EC instance, monitored, and maintained as a separate component alongside the Conforma CLI binary.
+It's deployed separatly alongside the Conforma CLI instance, monitored, and maintained as a separate component.
 
 In Kubernetes or standalone machine deployments, the Conforma Wrapper pod has its own resource requests/limits, independent of the Trustify pod.
 
