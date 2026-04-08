@@ -58,24 +58,15 @@ To track the progress of the external validation process through the Conforma HT
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Queued : User triggers validation
+    [*] --> Queued : User triggers validation<br/>INSERT() ON CONFLICT DO NOTHING
     Queued --> InProgress : Request submitted to <br/>Conforma Wrapper
     InProgress --> Completed : Outcome received
     InProgress --> Failed : Execution error<br/>(crash, timeout, fetch failure)
-    Completed --> [*]
+    Completed --> [*] : Update validation result <br/>(pass, fail or error)
     Failed --> [*]
 ```
 
-The "In Progress" state serves as a concurrency guard: if a validation is already running for a given SBOM + policy pair, subsequent requests are rejected (409 Conflict), preventing duplicate work.
-
-### Policy validation state
-
-The result of a Policy validation follows this lifecycle:
-
-- **Null** — initial state, indicates no validation has been triggered yet for this SBOM against this policy.
-- **Fail** — Conforma validation found policy violations; violation details are linked.
-- **Pass** — Conforma validation succeeded; the SBOM satisfies the policy.
-- **Error** — The Conforma validation has generated an error.
+The result of a Policy validation is updated only when the validation process is completed.
 
 ### What is stored where
 
