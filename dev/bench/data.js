@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775561625932,
+  "lastUpdate": 1776236474120,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -15165,6 +15165,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 10,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "24bc35a3b943cef25aceb2488c6534a098761a91",
+          "message": "test: add a reproducer for assigning groups concurrently\n\nAlso see TC-4012",
+          "timestamp": "2026-04-14T12:15:35Z",
+          "tree_id": "cd3b4427bed27bcec03b02272be1eefaacfa4366",
+          "url": "https://github.com/gildub/trustify/commit/24bc35a3b943cef25aceb2488c6534a098761a91"
+        },
+        "date": 1776236472818,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
             "unit": "s"
           }
         ]
