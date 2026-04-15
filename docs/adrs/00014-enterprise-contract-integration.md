@@ -40,8 +40,8 @@ Policy validation can be be very resource-intensive, especially for large SBOMs 
 
 - **Resource isolation** — A long-running or memory-heavy Conforma process cannot degrade Trustify's responsiveness.
 - **Independent scaling** — The Conforma Wrapper can be scaled horizontally (more replicas) based on validation demand without scaling the entire Trustify deployment. Conversely, Trustify can scale for query load without provisioning excess capacity for validation.
-- **Failure containment** — An EC instance crash (OOM kill, policy fetch timeout, unexpected CLI error) is isolated to the wrapper. Trustify records the failure as a terminal `status` and remains fully operational; the user may manually queue a new validation.
-- **Version independence** — The Conforma Wrapper and EC instance (Conforma CLI) can be upgraded or rolled back on their own release cadence, without redeploying Trustify. This is important given Conforma's active development pace.
+- **Failure containment** — An Conforma CLI crash (OOM kill, policy fetch timeout, unexpected CLI error) is isolated to the wrapper which will propagate back to Trustify the failure; This is a terminal state where the user will need to queue a new validation. In case the wrapper crashed, a timeout period will force Trustify to change the state of the queued validations to "Failed".
+- **Version independence** — The Conforma Wrapper and Conforma CLI can be upgraded or rolled back on their own release cadence, without redeploying Trustify. This is important given Conforma's active development pace.
 
 ### Validation process state
 
@@ -388,6 +388,7 @@ sequenceDiagram
 - `sbom_id` (UUID, FK → sbom)
 - `policy_id` (UUID, FK → policy)
 - `status` (ENUM) - 'null', 'queued', 'in_progress', 'completed', 'failed'
+- `error`(TEXT) - Error message
 - `result` (ENUM) - 'null', 'fail', 'pass' or 'error'
 - `results` (JSONB) - See model below
 - `summary` (JSONB) - Total checks, passed, failed, warnings, see model below
