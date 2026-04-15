@@ -106,7 +106,7 @@ Conforma is not available as WASM and would require major upstream changes.
 
 A Redis/RabbitMQ queue would improve retry handling and priority management; implement if the 429-based rejection approach proves insufficient under real load.
 
-## The solution
+## Details
 
 ### System Architecture
 
@@ -164,8 +164,8 @@ C4Container
     Rel(user, api, "Views compliance status", "HTTP API")
     Rel(webui, api, "API calls", "JSON/HTTP API")
     Rel(api, policyValidationModule, "Triggers validation", "Function call")
-    Rel(policyValidationModule, conformaWrapper, "POST /validation", "HTTP API formData")
-    Rel(conformaWrapper, api, "POST /validation/{id}/result", "HTTP API")
+    Rel(policyValidationModule, conformaWrapper, "POST /api/v1/validate", "HTTP API formData")
+    Rel(conformaWrapper, api, "POST /api/v2/policy/{id}/validation/{validation_id}/result", "HTTP API")
     Rel(conformaWrapper, conforma, "ec validate input {SBOM} {policy}", "Spawned command")
     Rel(policyValidationModule, postgres, "Saves validation<br/>results", "SQL")
     Rel(policyValidationModule, storage, "Stores EC reports", "Function call")
@@ -218,13 +218,13 @@ C4Component
         System_Ext(s3, "S3 Object Storage", "Stores SBOM documents and reports")
     }
 
-    Rel(api, policyEndpoints, "POST /ec/validate,\nGET /ec/report", "JSON/HTTPS")
+    Rel(api, policyEndpoints, "POST /api/v2/policy/{id}/validation,\nGET /api/v2/policy/{id}/validation/report,\nGET /api/v2/policy/{id}/validation/report/history,\nGET /api/v2/policy/{id}/validation/report/{result_id},\nPOST /api/v2/policy/{id}/validation/{validation_id}/result", "JSON/HTTPS")
     Rel(policyEndpoints, policyVeriferService, "validate_sbom() / get_ec_report()", "Function call")
     Rel(policyVeriferService, policyManager, "get_policy_config()", "Function call")
     Rel(policyManager, postgres, "SELECT policy", "SQL")
-    Rel(policyVeriferService, conformaWrapper, "POST /api/v1/validation → returns {id}", "HTTP")
+    Rel(policyVeriferService, conformaWrapper, "POST /api/v1/validate → returns {id}", "HTTP")
     Rel(conformaWrapper, conforma, "ec validate", "Process spawn")
-    Rel(conformaWrapper, api, "POST /api/v2/ec/validation/{validation_id}/result", "JSON/HTTPS")
+    Rel(conformaWrapper, api, "POST /api/v2/policy/{id}/validation/{validation_id}/result", "JSON/HTTPS")
     Rel(policyVeriferService, resultParser, "parse_output()", "Function call")
     Rel(policyVeriferService, resultPersistence, "save_results()", "Function call")
     Rel(resultPersistence, postgres, "INSERT policy_validation", "SQL")
@@ -254,7 +254,7 @@ sequenceDiagram
     participant S3 as Object Storage
     participant Wrapper as Conforma Wrapper (HTTP)
 
-    User->>API: POST /api/v2/ec/validate (multipart form: sbom_id, policy_id)
+    User->>API: POST /api/v2/policy/<policy_id>/validation?sbom_id=<sbom_id>
     API->>EP: dispatch request
     EP->>VS: validate_sbom(sbom_id, policy_id)
 
@@ -322,7 +322,7 @@ sequenceDiagram
     Wrapper->>Wrapper: Cleanup temp files
     Wrapper->>OIDC: POST /token (grant_type=client_credentials, client_id, client_secret)
     OIDC-->>Wrapper: {access_token, expires_in}
-    Wrapper->>API: POST /api/v2/ec/validation/{validation_id}/result {conforma JSON output}<br/>Authorization: Bearer <access_token>
+    Wrapper->>API: POST /api/v2/policy/{id}/validation/{validation_id}/result {conforma JSON output}<br/>Authorization: Bearer <access_token>
     API->>EP: dispatch callback
     EP->>VS: process_validation_result(validation_id, result)
 
@@ -701,18 +701,17 @@ Deleting a policy will fail if there are validation results referencing it.
 - 409 - if the policy has associated validation results
 - 412 - if the `IfMatch` header was present, but its value didn't match the stored revision
 
-### POST `/api/v2/policy/validate`
+### POST `/api/v2/policy/{id}/validation`
 
-Trigger a policy validation for a given SBOM and policy pair. The validation is performed asynchronously by the Conforma Wrapper; a `validation_id` is returned immediately.
+Trigger policy validation for a given SBOM. The validation is performed asynchronously by the Conforma Wrapper; a `validation_id` is returned immediately.
 
 If a validation is already in progress for the same SBOM + policy pair, the request is rejected with 409 Conflict.
 
 #### Request
 
-| part  | name        | type     | description                                                       |
-| ----- | ----------- | -------- | ----------------------------------------------------------------- |
-| query | `sbom_id`   | `String` | ID of the SBOM to validate                                        |
-| query | `policy_id` | `String` | ID of the policy to validate against (omit to use default policy) |
+| part  | name      | type     | description                |
+| ----- | --------- | -------- | -------------------------- |
+| query | `sbom_id` | `String` | ID of the SBOM to validate |
 
 #### Response
 
@@ -732,16 +731,15 @@ If a validation is already in progress for the same SBOM + policy pair, the requ
 - 409 - if a validation is already in progress for this SBOM + policy pair
 - 429 - if the Conforma Wrapper has reached its concurrency limit
 
-### GET `/api/v2/policy/report`
+### GET `/api/v2/policy/{id}/validation/report`
 
-Get the latest validation result for a given SBOM and policy pair.
+Get the latest validation result for a given SBOM.
 
 #### Request
 
-| part  | name        | type     | description                                   |
-| ----- | ----------- | -------- | --------------------------------------------- |
-| query | `sbom_id`   | `String` | ID of the SBOM                                |
-| query | `policy_id` | `String` | ID of the policy (omit to use default policy) |
+| part  | name      | type     | description    |
+| ----- | --------- | -------- | -------------- |
+| query | `sbom_id` | `String` | ID of the SBOM |
 
 #### Response
 
@@ -755,19 +753,18 @@ Get the latest validation result for a given SBOM and policy pair.
 - 403 - if the user was authenticated but not authorized
 - 404 - if the SBOM or policy was not found, or no validation has been performed yet
 
-### GET `/api/v2/policy/report/history`
+### GET `/api/v2/policy/{id}/validation/report/history`
 
-Get the validation history for a given SBOM and policy pair, ordered by `sbom_id` descending.
+Get the validation history for a given SBOM (newest first; typically ordered by validation row creation time or id descending).
 
 #### Request
 
-| part  | name        | type       | description                                             |
-| ----- | ----------- | ---------- | ------------------------------------------------------- |
-| query | `sbom_id`   | `String`   | ID of the SBOM                                          |
-| query | `policy_id` | `String`   | ID of the policy (omit to use default policy)           |
-| query | `q`         | "q" string | "q style" query string                                  |
-| query | `limit`     | u64        | Maximum number of items to return                       |
-| query | `offset`    | u64        | Initial items to skip before actually returning results |
+| part  | name      | type       | description                                             |
+| ----- | --------- | ---------- | ------------------------------------------------------- |
+| query | `sbom_id` | `String`   | ID of the SBOM                                          |
+| query | `q`       | "q" string | "q style" query string                                  |
+| query | `limit`   | u64        | Maximum number of items to return                       |
+| query | `offset`  | u64        | Initial items to skip before actually returning results |
 
 The following `q` parameters are supported:
 
@@ -790,7 +787,7 @@ The following `q` parameters are supported:
 - 403 - if the user was authenticated but not authorized
 - 404 - if the SBOM or policy was not found
 
-### GET `/api/v2/policy/report/{result_id}`
+### GET `/api/v2/policy/{id}/validation/report/{result_id}`
 
 Download the full raw Conforma JSON report from storage.
 
@@ -813,7 +810,7 @@ Download the full raw Conforma JSON report from storage.
 - 403 - if the user was authenticated but not authorized
 - 404 - if the validation result or report was not found
 
-### POST `/api/v2/policy/validation/{validation_id}/result`
+### POST `/api/v2/policy/{id}/validation/{validation_id}/result`
 
 Callback endpoint used by the Conforma Wrapper to post the validation result back to Trustify after Conforma CLI execution completes.
 
@@ -823,6 +820,7 @@ This endpoint is not intended for end-user use. Because Trustify enforces OAuth 
 
 | part   | name            | type     | description                                                                            |
 | ------ | --------------- | -------- | -------------------------------------------------------------------------------------- |
+| path   | `id`            | `String` | Policy id; must match the policy under which the validation was started                 |
 | path   | `validation_id` | `String` | ID of the validation (returned in the 202 response)                                    |
 | header | `Authorization` | `String` | `Bearer <access_token>` — token obtained from the OIDC provider via Client Credentials |
 | body   | -               | raw JSON | The raw Conforma CLI JSON output                                                       |
@@ -833,7 +831,7 @@ This endpoint is not intended for end-user use. Because Trustify enforces OAuth 
 - 400 - if the request could not be understood or the JSON is malformed
 - 401 - if the caller was not authenticated (missing or invalid Bearer token)
 - 403 - if the caller was not authorized (token lacks required scope/role)
-- 404 - if the validation ID was not found
+- 404 - if the policy or validation ID was not found, or the validation does not belong to this policy
 - 409 - if the validation already has a result (duplicate callback)
 
 ## Conforma Wrapper API Endpoints
@@ -854,7 +852,7 @@ The Conforma Wrapper must be pre-configured with OIDC client credentials so it c
 | --------- | -------------- | -------- | -------------------------------------------------------------------------- |
 | multipart | `sbom`         | file     | The SBOM document to validate (JSON or XML)                                |
 | multipart | `policy_ref`   | `String` | Policy source URL (e.g. `git://github.com/org/policy-repo?ref=main`)       |
-| multipart | `callback_url` | `String` | Trustify callback URL (`/api/v2/policy/validation/{validation_id}/result`) |
+| multipart | `callback_url` | `String` | Trustify callback URL (`/api/v2/policy/{policy_id}/validation/{validation_id}/result`) |
 | multipart | `extra_args`   | `String` | Additional CLI flags forwarded to Conforma (optional, JSON-encoded array)  |
 
 #### Response
