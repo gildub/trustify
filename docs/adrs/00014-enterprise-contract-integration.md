@@ -320,8 +320,6 @@ sequenceDiagram
     end
 
     Wrapper->>Wrapper: Cleanup temp files
-    Wrapper->>OIDC: POST /token (grant_type=client_credentials, client_id, client_secret)
-    OIDC-->>Wrapper: {access_token, expires_in}
     Wrapper->>API: POST /api/v2/policy/{id}/validation/{validation_id}/result {conforma JSON output}<br/>Authorization: Bearer <access_token>
     API->>EP: dispatch callback
     EP->>VS: process_validation_result(validation_id, result)
@@ -820,7 +818,7 @@ This endpoint is not intended for end-user use. Because Trustify enforces OAuth 
 
 | part   | name            | type     | description                                                                            |
 | ------ | --------------- | -------- | -------------------------------------------------------------------------------------- |
-| path   | `id`            | `String` | Policy id; must match the policy under which the validation was started                 |
+| path   | `id`            | `String` | Policy id; must match the policy under which the validation was started                |
 | path   | `validation_id` | `String` | ID of the validation (returned in the 202 response)                                    |
 | header | `Authorization` | `String` | `Bearer <access_token>` — token obtained from the OIDC provider via Client Credentials |
 | body   | -               | raw JSON | The raw Conforma CLI JSON output                                                       |
@@ -848,12 +846,12 @@ The Conforma Wrapper must be pre-configured with OIDC client credentials so it c
 
 #### Request
 
-| part      | name           | type     | description                                                                |
-| --------- | -------------- | -------- | -------------------------------------------------------------------------- |
-| multipart | `sbom`         | file     | The SBOM document to validate (JSON or XML)                                |
-| multipart | `policy_ref`   | `String` | Policy source URL (e.g. `git://github.com/org/policy-repo?ref=main`)       |
+| part      | name           | type     | description                                                                            |
+| --------- | -------------- | -------- | -------------------------------------------------------------------------------------- |
+| multipart | `sbom`         | file     | The SBOM document to validate (JSON or XML)                                            |
+| multipart | `policy_ref`   | `String` | Policy source URL (e.g. `git://github.com/org/policy-repo?ref=main`)                   |
 | multipart | `callback_url` | `String` | Trustify callback URL (`/api/v2/policy/{policy_id}/validation/{validation_id}/result`) |
-| multipart | `extra_args`   | `String` | Additional CLI flags forwarded to Conforma (optional, JSON-encoded array)  |
+| multipart | `extra_args`   | `String` | Additional CLI flags forwarded to Conforma (optional, JSON-encoded array)              |
 
 #### Response
 
