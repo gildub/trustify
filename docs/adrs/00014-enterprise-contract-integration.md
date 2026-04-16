@@ -474,7 +474,7 @@ enum ValidatorKind {
 /// The policy reference information
 #[derive(Serialize, Deserialize)]
 struct Policy {
-    id: Uuid,
+    id: String,
     name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     description: Option<String>,
@@ -579,10 +579,23 @@ struct ValidationOutcome {
 ```rust
 /// A single check result within `policy_validation.results`
 #[derive(Serialize, Deserialize)]
-struct PolicyValidationResult {
-    severity: String,
-    msg: String,
-    metadata: PolicyValidationResultMetadata,
+#[serde(tag = "severity")]
+enum PolicyValidationResult {
+    #[serde(rename = "violation")]
+    Violation {
+        msg: String,
+        metadata: PolicyValidationResultMetadata,
+    },
+    #[serde(rename = "warning")]
+    Warning {
+        msg: String,
+        metadata: PolicyValidationResultMetadata,
+    },
+    #[serde(rename = "success")]
+    Success {
+        msg: String,
+        metadata: PolicyValidationResultMetadata,
+    },
 }
 ```
 
