@@ -548,24 +548,27 @@ struct PolicyValidation {
     status: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     error: Option<String>,
-    /// Outcome: `'null'`, `'fail'`, `'pass'`, `'error'`
+    /// Present once `status` is `'completed'` or `'failed'`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    outcome: Option<ValidationOutcome>,
+}
+```
+
+```rust
+/// Outcome produced when a validation finishes (all-or-nothing)
+#[derive(Serialize, Deserialize)]
+struct ValidationOutcome {
+    /// `'fail'`, `'pass'`, `'error'`
     result: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    results: Option<Vec<PolicyValidationResult>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    success: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    total: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    violations: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    warnings: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    successes: Option<u32>,
+    results: Vec<PolicyValidationResult>,
+    success: bool,
+    total: u32,
+    violations: u32,
+    warnings: u32,
+    successes: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     type_metadata: Option<ConformaTypeMetadata>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    validation_time: Option<String>,
+    validation_time: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     source_document_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
