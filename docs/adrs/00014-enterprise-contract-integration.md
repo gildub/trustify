@@ -389,7 +389,13 @@ sequenceDiagram
 - `error`(TEXT) - Error message
 - `result` (ENUM) - 'null', 'fail', 'pass' or 'error'
 - `results` (JSONB) - See model below
-- `summary` (JSONB) - Total checks, passed, failed, warnings, see model below
+- `success` (BOOL) - Overall pass/fail outcome (mirrors Conforma's top-level `success` field)
+- `total` (NUMBER) - Total number of checks evaluated
+- `violations`(NUMBER) - Count of checks with violation severity
+- `warnings` (NUMBER) - Count of checks with warning severity
+- `successes` (NUMBER) - Count of checks that passed
+- `type_metadata` (JSONB) - Policy validator specific data
+- `validation_time` (DATETIME) - Evaluation duration
 - `source_document_id` (VARCHAR) - File system or S3 path to detailed report
 - `error_message` (TEXT) - Populated only on error status
 
@@ -441,33 +447,28 @@ sequenceDiagram
 ]
 ```
 
-**`policy_validation.summary` JSONB model:**
+**`policy_validation.type_metadata` JSONB model in the Conforma case:**
 
-| Field              | Type    | Required | Description                                                              |
-| ------------------ | ------- | -------- | ------------------------------------------------------------------------ |
-| `success`          | boolean | yes      | Overall pass/fail outcome (mirrors Conforma's top-level `success` field) |
-| `total`            | integer | yes      | Total number of checks evaluated                                         |
-| `violations`       | integer | yes      | Count of checks with violation severity                                  |
-| `warnings`         | integer | yes      | Count of checks with warning severity                                    |
-| `successes`        | integer | yes      | Count of checks that passed                                              |
-| `conforma_version` | string  | yes      | Version of Conforma CLI (e.g. `"v0.8.83"`)                               |
-| `effective_time`   | string  | yes      | ISO 8601 timestamp of evaluation provided by Conforma                    |
+| Field              | Type   | Required | Description                                |
+| ------------------ | ------ | -------- | ------------------------------------------ |
+| `conforma_version` | string | yes      | Version of Conforma CLI (e.g. `"v0.8.83"`) |
 
-`policy_validation.summary` example:
+`policy_validation.type_metadata` example:
 
 ```json
 {
-  "success": false,
-  "total": 3,
-  "violations": 1,
-  "warnings": 1,
-  "successes": 1,
-  "conforma_version": "v0.8.83",
-  "effective_time": "2026-03-03T14:36:55.807826709Z"
+  "conforma_version": "v0.8.83"
 }
 ```
 
 #### Data Model Implementation
+
+```rust
+enum ValidatorKind {
+    Null,
+    Conforma,
+}
+```
 
 ```rust
 /// The policy reference information
@@ -477,8 +478,10 @@ struct Policy {
     name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     description: Option<String>,
-    policy_type: String,
-    configuration: PolicyConfiguration,
+    policy_type: ValidatorKind,
+    configuration: serde_json::Value,
+    /// Conditional updates compare this revision (also exposed as `ETag` on GET).
+    revision: Uuid,
 }
 ```
 
@@ -489,8 +492,20 @@ struct PolicyRequest {
     name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     description: Option<String>,
-    policy_type: String,
-    configuration: PolicyConfiguration,
+    policy_type: ValidatorKind,
+    configuration: serde_json::Value,
+}
+```
+
+```rust
+/// Credentials for private policy repos (`policy.configuration.auth`)
+#[derive(Serialize, Deserialize)]
+struct PolicyAuth {
+    /// `"token"`, `"ssh_key"`, or `"none"`
+    #[serde(rename = "type")]
+    auth_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    token_encrypted: Option<String>,
 }
 ```
 
@@ -515,18 +530,42 @@ struct PolicyConfiguration {
 ```
 
 ```rust
-/// Validation result returned by the API
+/// Conforma-specific `policy_validation.type_metadata`
+#[derive(Serialize, Deserialize)]
+struct ConformaTypeMetadata {
+    conforma_version: String,
+}
+```
+
+```rust
+/// One row per validation execution (`policy_validation`)
 #[derive(Serialize, Deserialize)]
 struct PolicyValidation {
-    id: Uuid,
-    sbom_id: Uuid,
-    policy_id: Uuid,
-    state: String,
+    id: String,
+    sbom_id: String,
+    policy_id: String,
+    /// Lifecycle: `'null'`, `'queued'`, `'in_progress'`, `'completed'`, `'failed'`
+    status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+    /// Outcome: `'null'`, `'fail'`, `'pass'`, `'error'`
     result: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     results: Option<Vec<PolicyValidationResult>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    summary: Option<PolicyValidationSummary>,
+    success: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    total: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    violations: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    warnings: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    successes: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    type_metadata: Option<ConformaTypeMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    validation_time: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     source_document_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -535,21 +574,7 @@ struct PolicyValidation {
 ```
 
 ```rust
-/// Summary of a validation execution (stored as JSONB)
-#[derive(Serialize, Deserialize)]
-struct PolicyValidationSummary {
-    success: bool,
-    total: u16,
-    violations: u16,
-    warnings: u16,
-    successes: u16,
-    conforma_version: String,
-    effective_time: String,
-}
-```
-
-```rust
-/// A single check result within a validation
+/// A single check result within `policy_validation.results`
 #[derive(Serialize, Deserialize)]
 struct PolicyValidationResult {
     severity: String,
