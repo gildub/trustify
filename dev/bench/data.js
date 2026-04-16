@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776236474120,
+  "lastUpdate": 1776356333291,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -15194,6 +15194,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "86094767+mrrajan@users.noreply.github.com",
+            "name": "mrrajan",
+            "username": "mrrajan"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": false,
+          "id": "18543a1a1767c005263a3658da9903d5df6994e2",
+          "message": "refactor: change load_user to bool type and align naming\n- Change UiConfig.load_user from String to bool for type safety\n- Rename arg id from \"oidc-load-user\" to \"ui-load-user\"\n- Rename env var from OIDC_LOAD_USER to UI_LOAD_USER for consistency\n- Add .to_string() conversion when passing to UI struct\n- Add UI_LOAD_USER to environment variables documentation\nAssisted-by: Claude Code",
+          "timestamp": "2026-04-15T09:29:30Z",
+          "tree_id": "fa57e3d7bc09e590c797e4a58c779faf1f973086",
+          "url": "https://github.com/gildub/trustify/commit/18543a1a1767c005263a3658da9903d5df6994e2"
+        },
+        "date": 1776356331675,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 7,
             "unit": "s"
           }
         ]
