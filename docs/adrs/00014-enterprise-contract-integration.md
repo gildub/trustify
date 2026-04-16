@@ -354,9 +354,9 @@ sequenceDiagram
 | Field                  | Type     | Required        | Description                                                                      |
 | ---------------------- | -------- | --------------- | -------------------------------------------------------------------------------- |
 | `policy_ref`           | string   | yes             | Policy source URL, e.g. `"git://[URL]?ref=[BRANCH OR TAG]"`                      |
-| `auth`                 | object   | no              | Credentials for private repos; sensitive values encrypted via AES (never logged) |
+| `auth`                 | object   | no              | Credentials for private repos; sensitive values encrypted via `ring::aead` AES-256-GCM (never logged) |
 | `auth.type`            | string   | yes (if `auth`) | `"token"`, `"ssh_key"`, or `"none"`                                              |
-| `auth.token_encrypted` | string   | no              | AES-encrypted bearer/PAT token, prefixed with encryption scheme                  |
+| `auth.token_encrypted` | string   | no              | AES-256-GCM encrypted bearer/PAT token, prefixed with encryption scheme          |
 | `policy_paths`         | string[] | no              | Sub-paths within the repo to evaluate (maps to Conforma `--policy` source paths) |
 | `exclude`              | string[] | no              | Rule codes to skip during validation                                             |
 | `include`              | string[] | no              | If non-empty, only these rule codes are evaluated                                |
@@ -370,7 +370,7 @@ sequenceDiagram
   "policy_ref": "git://github.com/org/policy-repo?ref=main",
   "auth": {
     "type": "token",
-    "token_encrypted": "AES256:<base64-ciphertext>"
+    "token_encrypted": "AES-256-GCM:<base64-nonce>:<base64-ciphertext>"
   },
   "policy_paths": ["policy/lib", "policy/release"],
   "exclude": ["hello_world.minimal_packages"],
@@ -396,7 +396,7 @@ sequenceDiagram
 - `successes` (NUMBER) - Count of checks that passed
 - `type_metadata` (JSONB) - Policy validator specific data
 - `validation_time` (DATETIME) - Evaluation duration
-- `source_document_id` (VARCHAR) - File system or S3 path to detailed report
+- `source_document_id` (VARCHAR) - File system or S3 id of the detailed report
 - `error_message` (TEXT) - Populated only on error status
 
 **`policy_validation.results` JSONB model:**
@@ -610,6 +610,58 @@ struct PolicyValidationResultMetadata {
     solution: Option<String>,
 }
 ```
+
+## Trustify API Endpoints
+
+```
+POST   /api/v2/policy                                                  # Create a new policy reference
+GET    /api/v2/policy                                                  # List policy references
+GET    /api/v2/policy/{id}                                             # Get a single policy reference
+PUT    /api/v2/policy/{id}                                             # Update a policy reference
+DELETE /api/v2/policy/{id}                                             # Delete a policy reference
+POST   /api/v2/policy/{id}/validation                                  # Trigger policy validation
+GET    /api/v2/policy/{id}/validation/report                           # Get latest validation result
+GET    /api/v2/policy/{id}/validation/report/history                   # Get validation history
+GET    /api/v2/policy/{id}/validation/report/{result_id}               # Download full report
+POST   /api/v2/policy/{id}/validation/{validation_id}/result           # Callback for validation result
+```
+
+### Permissions
+
+The policy module introduces the following permissions, following the existing Trustify CRUD convention:
+
+| Permission       | Description                                                        |
+| ---------------- | ------------------------------------------------------------------ |
+| `create.policy`  | Create policy references and trigger validations                   |
+| `read.policy`    | List/get policy references and read validation results and reports |
+| `update.policy`  | Update policy references and post validation results (callback)    |
+| `delete.policy`  | Delete policy references                                           |
+
+These permissions map to the default OIDC scope groups:
+
+| Scope             | Permissions granted            |
+| ----------------- | ------------------------------ |
+| `create:document` | `create.policy`                |
+| `read:document`   | `read.policy`                  |
+| `update:document` | `update.policy`                |
+| `delete:document` | `delete.policy`                |
+
+Endpoint permission requirements:
+
+| Endpoint                                                      | Permission       |
+| ------------------------------------------------------------- | ---------------- |
+| `POST /api/v2/policy`                                         | `create.policy`  |
+| `GET /api/v2/policy`                                          | `read.policy`    |
+| `GET /api/v2/policy/{id}`                                     | `read.policy`    |
+| `PUT /api/v2/policy/{id}`                                     | `update.policy`  |
+| `DELETE /api/v2/policy/{id}`                                  | `delete.policy`  |
+| `POST /api/v2/policy/{id}/validation`                         | `create.policy`  |
+| `GET /api/v2/policy/{id}/validation/report`                   | `read.policy`    |
+| `GET /api/v2/policy/{id}/validation/report/history`           | `read.policy`    |
+| `GET /api/v2/policy/{id}/validation/report/{result_id}`       | `read.policy`    |
+| `POST /api/v2/policy/{id}/validation/{validation_id}/result`  | `update.policy`  |
+
+The Conforma Wrapper's OIDC client (see [Conforma Wrapper OIDC Configuration](#conforma-wrapper-oidc-configuration)) should be registered with the minimal scope required — only `update:document` (granting `update.policy`) — so it can post results to the callback endpoint.
 
 ### POST `/api/v2/policy`
 
@@ -875,24 +927,23 @@ This endpoint is not intended for end-user use. Because Trustify enforces OAuth 
 
 ## Conforma Wrapper API Endpoints
 
-```
-POST   /api/v1/validate                     # Validate uploaded SBOM file against the provided Policy URL (multipart form)
-```
-
 ### POST `/api/v1/validate`
 
 Accept an SBOM document and policy reference, spawn a Conforma CLI validation, and asynchronously post the result back to the Trustify callback endpoint.
 
-The Conforma Wrapper must be pre-configured with OIDC client credentials so it can authenticate to Trustify when posting results back (see [Conforma Wrapper OIDC Configuration](#conforma-wrapper-oidc-configuration)).
+Because the Conforma Wrapper is a network-accessible service, it **must authenticate incoming requests** using the same OIDC provider that Trustify uses. Callers must present a valid Bearer token obtained from the shared OIDC provider. The Wrapper validates the token by fetching the provider's JWKS and verifying the signature, expiry, and issuer — exactly the same mechanism Trustify uses for its own endpoints (see `trustify-auth` / `Authenticator`). This ensures that only authorized Trustify instances (or other permitted clients) can trigger validations.
+
+The Conforma Wrapper must also be pre-configured with OIDC client credentials so it can authenticate to Trustify when posting results back (see [Conforma Wrapper OIDC Configuration](#conforma-wrapper-oidc-configuration)).
 
 #### Request
 
-| part      | name           | type     | description                                                                            |
-| --------- | -------------- | -------- | -------------------------------------------------------------------------------------- |
-| multipart | `sbom`         | file     | The SBOM document to validate (JSON or XML)                                            |
-| multipart | `policy_ref`   | `String` | Policy source URL (e.g. `git://github.com/org/policy-repo?ref=main`)                   |
-| multipart | `callback_url` | `String` | Trustify callback URL (`/api/v2/policy/{policy_id}/validation/{validation_id}/result`) |
-| multipart | `extra_args`   | `String` | Additional CLI flags forwarded to Conforma (optional, JSON-encoded array)              |
+| part      | name            | type     | description                                                                            |
+| --------- | --------------- | -------- | -------------------------------------------------------------------------------------- |
+| header    | `Authorization` | `String` | `Bearer <access_token>` — token obtained from the shared OIDC provider                 |
+| multipart | `sbom`          | file     | The SBOM document to validate (JSON or XML)                                            |
+| multipart | `policy_ref`    | `String` | Policy source URL (e.g. `git://github.com/org/policy-repo?ref=main`)                   |
+| multipart | `callback_url`  | `String` | Trustify callback URL (`/api/v2/policy/{policy_id}/validation/{validation_id}/result`) |
+| multipart | `extra_args`    | `String` | Additional CLI flags forwarded to Conforma (optional, JSON-encoded array)              |
 
 #### Response
 
@@ -906,10 +957,11 @@ The Conforma Wrapper must be pre-configured with OIDC client credentials so it c
   ```
 
 - 400 - if the request could not be understood or required fields are missing
-- 401 - if the caller was not authenticated
+- 401 - if the caller was not authenticated (missing or invalid Bearer token)
+- 403 - if the caller was authenticated but not authorized (token lacks required scope/role)
 - 429 - if the concurrency semaphore is exhausted (too many concurrent validations)
 
-### Trustify File Structure
+## File Structure
 
 ```
 modules/policy/
@@ -930,39 +982,68 @@ modules/policy/
 │   │   └── result_parser.rs    # Output parsing
 │   └── client/
 │        └── conforma.rs         # Conforma client adapter
-└── conforma_wrapper
-    ├── build.rs
-    ├── Cargo.toml
-    └── src/
-        ├── endpoints/
-        │   └── mod.rs          # REST endpoints
-        └── lib.rs
+modules/conforma_wrapper
+├── build.rs
+├── Cargo.toml
+└── src/
+    ├── endpoints/
+    │   └── mod.rs          # REST endpoints
+    └── lib.rs
 ```
 
-### Technical Considerations
+## Technical Considerations
 
 #### Conforma Wrapper OIDC Configuration
 
-The Conforma Wrapper acts as a service client that must authenticate to Trustify when posting validation results back via the callback endpoint. It uses the **OAuth 2.0 Client Credentials Grant** — a standard machine-to-machine flow where the Wrapper exchanges its client credentials for an access token from the OIDC provider.
+The Conforma Wrapper has two distinct OIDC responsibilities that share the **same OIDC provider** (e.g. the Keycloak realm used by Trustify):
+
+1. **Inbound authentication** — validate Bearer tokens on incoming requests to `/api/v1/validate`, ensuring only authorized callers (Trustify, CI systems, etc.) can trigger validations.
+2. **Outbound authentication** — obtain an access token via the Client Credentials Grant to authenticate when posting results back to the Trustify callback endpoint.
+
+Because both directions use the same OIDC provider, the Wrapper only needs a single issuer URL. It fetches the provider's discovery document (`.well-known/openid-configuration`) once at startup to obtain the JWKS URI (for inbound token validation) and the token endpoint (for outbound token acquisition).
+
+Conversely, the **Conforma client adapter** in Trustify (`modules/policy/src/client/conforma.rs`) also acts as a server: it exposes the callback endpoint (`POST /api/v2/policy/{policy_id}/validation/{validation_id}/result`) that receives validation results from the Conforma Wrapper. This endpoint must be protected so that only the Wrapper — authenticated via its Client Credentials token — can post results. Because the callback endpoint is a standard Trustify REST endpoint, it is protected by Trustify's existing OIDC authentication middleware (`trustify-auth` / `Authenticator`), which validates the Bearer token the Wrapper obtained during its outbound token acquisition. The OIDC client registered for the Wrapper must be granted the minimum role or scope required to call this callback (e.g. `policy:write`), and Trustify must reject tokens that lack the necessary permission with 403 Forbidden.
+
+##### Environment Variables
 
 The following environment variables (or equivalent configuration) must be set at deployment time:
 
-| Variable                       | Required | Description                                                                                                 |
-| ------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------- |
-| `TRUSTIFY_OIDC_TOKEN_ENDPOINT` | yes      | OIDC token endpoint URL (e.g. `https://keycloak.example.com/realms/trustify/protocol/openid-connect/token`) |
-| `TRUSTIFY_OIDC_CLIENT_ID`      | yes      | Client ID registered in the OIDC provider for the Conforma Wrapper                                          |
-| `TRUSTIFY_OIDC_CLIENT_SECRET`  | yes      | Client secret for the registered client                                                                     |
-| `TRUSTIFY_OIDC_SCOPE`          | no       | OAuth scope to request (defaults to provider default; set if Trustify requires a specific scope)            |
+| Variable                         | Required | Description                                                                                                                               |
+| -------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `TRUSTIFY_OIDC_ISSUER_URL`       | yes      | OIDC issuer URL (e.g. `https://keycloak.example.com/realms/trustify`). Used for discovery of JWKS, token endpoint, and issuer validation. |
+| `TRUSTIFY_OIDC_CLIENT_ID`        | yes      | Client ID registered in the OIDC provider for the Conforma Wrapper (used for both inbound audience validation and outbound token grant)   |
+| `TRUSTIFY_OIDC_CLIENT_SECRET`    | yes      | Client secret for the registered client (used for the outbound Client Credentials Grant)                                                  |
+| `TRUSTIFY_OIDC_SCOPE`            | no       | OAuth scope to request on outbound token grants (defaults to provider default; set if Trustify requires a specific scope)                 |
+| `TRUSTIFY_OIDC_TLS_INSECURE`     | no       | Disable TLS certificate validation for the OIDC provider (default `false`; only for development)                                          |
+| `TRUSTIFY_OIDC_TLS_CA_CERTIFICATES` | no   | Additional CA certificates to trust when communicating with the OIDC provider                                                             |
+
+##### Inbound Token Validation
+
+On startup the Wrapper fetches the JWKS from the OIDC provider's discovery endpoint and caches it. For each incoming request to `/api/v1/validate`:
+
+1. Extract the `Authorization: Bearer <token>` header.
+2. Verify the JWT signature against the cached JWKS (refresh on cache miss for key rotation).
+3. Validate standard claims: `iss` matches `TRUSTIFY_OIDC_ISSUER_URL`, token is not expired, `aud` or `azp` includes the expected client.
+4. On failure return 401 Unauthorized.
+
+This follows the same validation logic that Trustify's own `Authenticator` uses (see `trustify-auth` crate), so the Wrapper can reuse or mirror that implementation.
+
+##### Outbound Token Acquisition
+
+For posting results back to Trustify the Wrapper uses the **OAuth 2.0 Client Credentials Grant**:
 
 **Token lifecycle**: The Wrapper should cache the access token and refresh it proactively before expiry (using the `expires_in` value from the token response). This avoids a token request on every callback and handles clock skew by refreshing with a safety margin (e.g. 30 seconds before expiry).
 
-**Failure handling**: If the token request fails (OIDC provider unreachable, invalid credentials), the Wrapper cannot deliver the callback. The validation remains in `in_progress` state until Trustify's timeout mechanism marks it as `failed`. The Wrapper should log the token acquisition error and may retry with exponential backoff before giving up.
+**Failure handling**: If the token request fails (OIDC provider unreachable, invalid credentials), the Wrapper cannot deliver the callback. The validation remains in `in_progress` state until Trustify's timeout mechanism marks it as `failed` (see below). The Wrapper should log the token acquisition error and may retry with exponential backoff before giving up.
 
-**Security considerations**:
+**Trustify timeout mechanism**: A background reaper task runs periodically inside the Policy Verifier service (default interval: 60 seconds). On each tick it queries for `policy_validation` rows whose `status` is `in_progress` and whose `updated_at` timestamp is older than the configured timeout (default: the policy's `timeout_seconds`, falling back to the global default of 5 minutes). Each stale row is transitioned to `status = 'failed'` with an `error` of `"Validation timed out"`. This covers every failure scenario where the Wrapper never delivers a callback — CLI hang, Wrapper crash, network partition, or token acquisition failure. The reaper uses an `UPDATE … WHERE status = 'in_progress' AND updated_at < NOW() - interval` query so it is idempotent and safe to run from multiple Trustify replicas concurrently.
+
+##### Security Considerations
 
 - The client secret must be stored securely (e.g. Kubernetes Secret, vault injection) and never logged.
-- The OIDC client should be registered with minimal scopes/roles — only the permission required to call the callback endpoint (`policy:write` or equivalent).
-- TLS is required for all OIDC token endpoint communication.
+- The OIDC client registered for the Conforma Wrapper should be a **dedicated confidential client** (e.g. `conforma-wrapper`) in the OIDC provider, separate from clients used by human users or other services. This client should be granted a narrow, purpose-specific scope — `trustify:policy-callback` — that maps to the single permission needed to post validation results to the callback endpoint. Trustify's authorization middleware must enforce this scope on the callback route (`POST /api/v2/policy/{policy_id}/validation/{validation_id}/result`), rejecting tokens that lack it with 403 Forbidden. By using a dedicated client and scope rather than a broad role like `policy:write`, the blast radius of a compromised credential is limited to callback delivery only — the Wrapper cannot read, delete, or otherwise mutate policies or other Trustify resources.
+- TLS is required for all OIDC communication (provider discovery, JWKS fetch, token endpoint).
+- The Wrapper should reject tokens from unexpected issuers; the `TRUSTIFY_OIDC_ISSUER_URL` acts as an allowlist of exactly one trusted issuer.
 
 #### Conforma CLI Execution
 
@@ -979,18 +1060,31 @@ Concurrency is controlled at two levels:
 
 If demand grows beyond what the semaphore-based approach can handle, a proper queue (Redis/RabbitMQ) is a deferred alternative (see _Batch Processing Queue_ in Alternatives Considered above).
 
+##### Kubernetes Deployment
+
+When both Trustify and the Conforma Wrapper are deployed on a Kubernetes cluster, native K8s primitives can complement the application-level concurrency controls described above:
+
+- **Readiness and liveness probes** — The Conforma Wrapper exposes two health endpoints that Kubernetes uses to manage pod lifecycle and traffic routing:
+  - *Liveness* (`GET /healthz`) — returns 200 if the process is alive. Kubernetes restarts the pod if this probe fails (e.g. deadlock, unrecoverable panic). The check is lightweight: it confirms the HTTP server loop is responsive and, optionally, that the OIDC JWKS cache is populated.
+  - *Readiness* (`GET /readyz`) — returns 200 when the pod can accept new work, and 503 when it cannot. The readiness check is tied to the concurrency semaphore: when all permits are in use, the endpoint returns 503, signalling Kubernetes to remove the pod from the Service's endpoint list. New requests are then routed only to pods that still have capacity. Once a permit is released, the probe returns 200 and the pod re-enters the rotation. This provides cluster-level backpressure that is transparent to Trustify — the K8s Service load-balances across ready pods automatically, reducing the likelihood of 429 responses reaching the caller. A 429 is still returned as a last resort if a request arrives between a readiness check and semaphore exhaustion.
+- **Horizontal Pod Autoscaler (HPA)** — The Wrapper Deployment can be configured with an HPA that scales replicas based on CPU/memory utilization or a custom metric such as the in-flight validation count exposed via a `/metrics` endpoint. Because the readiness probe already removes saturated pods from the Service, the HPA's scaling decisions and the readiness-driven traffic shifting work together: the HPA adds capacity while readiness prevents overload on existing pods. This allows the cluster to absorb demand spikes without requiring a centralized queue.
+- **Resource limits and requests** — Each Wrapper pod should declare CPU and memory `requests` and `limits` that account for the peak resource usage of the CLI subprocess (the semaphore concurrency multiplied by the per-process footprint). This prevents a burst of validations from starving other workloads on the node.
+- **NetworkPolicy** — A Kubernetes `NetworkPolicy` can restrict ingress to the Wrapper pods so that only Trustify pods (selected by label) are allowed to reach the `/api/v1/validate` endpoint. This provides a network-layer defense-in-depth on top of the OIDC-based authentication, ensuring that even if a valid token were leaked, it could not be used from outside the trusted namespace.
+- **Service discovery** — Trustify references the Wrapper via its Kubernetes `Service` DNS name (e.g. `conforma-wrapper.trustify.svc.cluster.local`). This decouples Trustify from individual pod IPs and lets K8s load-balance requests across ready Wrapper replicas automatically. Combined with the readiness probe, Trustify never needs to be aware of individual pod capacity — the Service only routes to pods that have reported ready.
+- **Secrets management** — The OIDC client secret and any policy-repo credentials should be mounted from Kubernetes `Secret` resources (or injected via an external secrets operator such as External Secrets or HashiCorp Vault Agent) rather than embedded in environment variable literals. This integrates with K8s RBAC to limit which pods and service accounts can access the sensitive material.
+
 #### Policy Management
 
 When the policy.policy_type is "Conforma", the initial only policy type supported, the `policy` is using external references only and therefore Trustify does not cache policy content.
 
 Conforma fetches the policy at validation time from the git source specified in `policy.configuration.policy_ref`.
 
-The trade-off: validation always uses the latest policy content from the referenced branch or tag, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the `configuration` JSONB column and encrypted using the AES crate; they are never logged.
+The trade-off: validation always uses the latest policy content from the referenced branch or tag, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the `configuration` JSONB column and encrypted at rest using `ring::aead` (AES-256-GCM authenticated encryption); they are never logged. The `ring` crate is already a direct dependency of the project (used for digest hashing), so no new dependency is required.
 
 The `policy_validation.policy_version` field records the policy commit hash or tag resolved from the `policy_ref` git source at validation time, enabling reproducibility and audit.
 `policy_validation.summary.conforma_version`, which tracks the Conforma CLI tool version number (e.g., `v0.8.83`).
 
-### Futur work
+## Future Work
 
 #### Validation on SBOM upload
 
@@ -1002,7 +1096,7 @@ Policy references are global (shared across all users) in this initial implement
 
 This is out of scope of this ADR.
 
-### References
+## References
 
 - [Enterprise Contract (Conforma) GitHub](https://github.com/enterprise-contract/ec-cli)
 - [Design Document](../design/enterprise-contract-integration.md)
