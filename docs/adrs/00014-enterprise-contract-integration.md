@@ -28,7 +28,6 @@ Users need the ability to:
 We will integrate Conforma into Trustify as a user triggered validation service by interacting with Conforma CLI.  
 Validation is manually triggered — not automatic on SBOM upload.  
 Trustify stores information to identify (id, name, URL) of Policies.
-A default Policy is defined at the application level (global policy) which is used for validation when an SBOM does not have any Policy explicitly attached to it.
 
 Conforma CLI is deployed separately from Trustify as either a standalone container or equivalent.
 
@@ -351,17 +350,17 @@ sequenceDiagram
 
 **`policy.configuration` JSONB model:**
 
-| Field                  | Type     | Required        | Description                                                                      |
-| ---------------------- | -------- | --------------- | -------------------------------------------------------------------------------- |
-| `policy_ref`           | string   | yes             | Policy source URL, e.g. `"git://[URL]?ref=[BRANCH OR TAG]"`                      |
+| Field                  | Type     | Required        | Description                                                                                           |
+| ---------------------- | -------- | --------------- | ----------------------------------------------------------------------------------------------------- |
+| `policy_ref`           | string   | yes             | Policy source URL, e.g. `"git://[URL]?ref=[BRANCH OR TAG]"`                                           |
 | `auth`                 | object   | no              | Credentials for private repos; sensitive values encrypted via `ring::aead` AES-256-GCM (never logged) |
-| `auth.type`            | string   | yes (if `auth`) | `"token"`, `"ssh_key"`, or `"none"`                                              |
-| `auth.token_encrypted` | string   | no              | AES-256-GCM encrypted bearer/PAT token, prefixed with encryption scheme          |
-| `policy_paths`         | string[] | no              | Sub-paths within the repo to evaluate (maps to Conforma `--policy` source paths) |
-| `exclude`              | string[] | no              | Rule codes to skip during validation                                             |
-| `include`              | string[] | no              | If non-empty, only these rule codes are evaluated                                |
-| `timeout_seconds`      | integer  | no              | Per-policy override of the default 5-minute execution timeout                    |
-| `extra_args`           | string[] | no              | Additional CLI flags forwarded verbatim to Conforma                              |
+| `auth.type`            | string   | yes (if `auth`) | `"token"`, `"ssh_key"`, or `"none"`                                                                   |
+| `auth.token_encrypted` | string   | no              | AES-256-GCM encrypted bearer/PAT token, prefixed with encryption scheme                               |
+| `policy_paths`         | string[] | no              | Sub-paths within the repo to evaluate (maps to Conforma `--policy` source paths)                      |
+| `exclude`              | string[] | no              | Rule codes to skip during validation                                                                  |
+| `include`              | string[] | no              | If non-empty, only these rule codes are evaluated                                                     |
+| `timeout_seconds`      | integer  | no              | Per-policy override of the default 5-minute execution timeout                                         |
+| `extra_args`           | string[] | no              | Additional CLI flags forwarded verbatim to Conforma                                                   |
 
 `policy.configuration` example :
 
@@ -630,36 +629,36 @@ POST   /api/v2/policy/{id}/validation/{validation_id}/result           # Callbac
 
 The policy module introduces the following permissions, following the existing Trustify CRUD convention:
 
-| Permission       | Description                                                        |
-| ---------------- | ------------------------------------------------------------------ |
-| `create.policy`  | Create policy references and trigger validations                   |
-| `read.policy`    | List/get policy references and read validation results and reports |
-| `update.policy`  | Update policy references and post validation results (callback)    |
-| `delete.policy`  | Delete policy references                                           |
+| Permission      | Description                                                        |
+| --------------- | ------------------------------------------------------------------ |
+| `create.policy` | Create policy references and trigger validations                   |
+| `read.policy`   | List/get policy references and read validation results and reports |
+| `update.policy` | Update policy references and post validation results (callback)    |
+| `delete.policy` | Delete policy references                                           |
 
 These permissions map to the default OIDC scope groups:
 
-| Scope             | Permissions granted            |
-| ----------------- | ------------------------------ |
-| `create:document` | `create.policy`                |
-| `read:document`   | `read.policy`                  |
-| `update:document` | `update.policy`                |
-| `delete:document` | `delete.policy`                |
+| Scope             | Permissions granted |
+| ----------------- | ------------------- |
+| `create:document` | `create.policy`     |
+| `read:document`   | `read.policy`       |
+| `update:document` | `update.policy`     |
+| `delete:document` | `delete.policy`     |
 
 Endpoint permission requirements:
 
-| Endpoint                                                      | Permission       |
-| ------------------------------------------------------------- | ---------------- |
-| `POST /api/v2/policy`                                         | `create.policy`  |
-| `GET /api/v2/policy`                                          | `read.policy`    |
-| `GET /api/v2/policy/{id}`                                     | `read.policy`    |
-| `PUT /api/v2/policy/{id}`                                     | `update.policy`  |
-| `DELETE /api/v2/policy/{id}`                                  | `delete.policy`  |
-| `POST /api/v2/policy/{id}/validation`                         | `create.policy`  |
-| `GET /api/v2/policy/{id}/validation/report`                   | `read.policy`    |
-| `GET /api/v2/policy/{id}/validation/report/history`           | `read.policy`    |
-| `GET /api/v2/policy/{id}/validation/report/{result_id}`       | `read.policy`    |
-| `POST /api/v2/policy/{id}/validation/{validation_id}/result`  | `update.policy`  |
+| Endpoint                                                     | Permission      |
+| ------------------------------------------------------------ | --------------- |
+| `POST /api/v2/policy`                                        | `create.policy` |
+| `GET /api/v2/policy`                                         | `read.policy`   |
+| `GET /api/v2/policy/{id}`                                    | `read.policy`   |
+| `PUT /api/v2/policy/{id}`                                    | `update.policy` |
+| `DELETE /api/v2/policy/{id}`                                 | `delete.policy` |
+| `POST /api/v2/policy/{id}/validation`                        | `create.policy` |
+| `GET /api/v2/policy/{id}/validation/report`                  | `read.policy`   |
+| `GET /api/v2/policy/{id}/validation/report/history`          | `read.policy`   |
+| `GET /api/v2/policy/{id}/validation/report/{result_id}`      | `read.policy`   |
+| `POST /api/v2/policy/{id}/validation/{validation_id}/result` | `update.policy` |
 
 The Conforma Wrapper's OIDC client (see [Conforma Wrapper OIDC Configuration](#conforma-wrapper-oidc-configuration)) should be registered with the minimal scope required — only `update:document` (granting `update.policy`) — so it can post results to the callback endpoint.
 
@@ -1008,14 +1007,14 @@ Conversely, the **Conforma client adapter** in Trustify (`modules/policy/src/cli
 
 The following environment variables (or equivalent configuration) must be set at deployment time:
 
-| Variable                         | Required | Description                                                                                                                               |
-| -------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `TRUSTIFY_OIDC_ISSUER_URL`       | yes      | OIDC issuer URL (e.g. `https://keycloak.example.com/realms/trustify`). Used for discovery of JWKS, token endpoint, and issuer validation. |
-| `TRUSTIFY_OIDC_CLIENT_ID`        | yes      | Client ID registered in the OIDC provider for the Conforma Wrapper (used for both inbound audience validation and outbound token grant)   |
-| `TRUSTIFY_OIDC_CLIENT_SECRET`    | yes      | Client secret for the registered client (used for the outbound Client Credentials Grant)                                                  |
-| `TRUSTIFY_OIDC_SCOPE`            | no       | OAuth scope to request on outbound token grants (defaults to provider default; set if Trustify requires a specific scope)                 |
-| `TRUSTIFY_OIDC_TLS_INSECURE`     | no       | Disable TLS certificate validation for the OIDC provider (default `false`; only for development)                                          |
-| `TRUSTIFY_OIDC_TLS_CA_CERTIFICATES` | no   | Additional CA certificates to trust when communicating with the OIDC provider                                                             |
+| Variable                            | Required | Description                                                                                                                               |
+| ----------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `TRUSTIFY_OIDC_ISSUER_URL`          | yes      | OIDC issuer URL (e.g. `https://keycloak.example.com/realms/trustify`). Used for discovery of JWKS, token endpoint, and issuer validation. |
+| `TRUSTIFY_OIDC_CLIENT_ID`           | yes      | Client ID registered in the OIDC provider for the Conforma Wrapper (used for both inbound audience validation and outbound token grant)   |
+| `TRUSTIFY_OIDC_CLIENT_SECRET`       | yes      | Client secret for the registered client (used for the outbound Client Credentials Grant)                                                  |
+| `TRUSTIFY_OIDC_SCOPE`               | no       | OAuth scope to request on outbound token grants (defaults to provider default; set if Trustify requires a specific scope)                 |
+| `TRUSTIFY_OIDC_TLS_INSECURE`        | no       | Disable TLS certificate validation for the OIDC provider (default `false`; only for development)                                          |
+| `TRUSTIFY_OIDC_TLS_CA_CERTIFICATES` | no       | Additional CA certificates to trust when communicating with the OIDC provider                                                             |
 
 ##### Inbound Token Validation
 
@@ -1065,8 +1064,8 @@ If demand grows beyond what the semaphore-based approach can handle, a proper qu
 When both Trustify and the Conforma Wrapper are deployed on a Kubernetes cluster, native K8s primitives can complement the application-level concurrency controls described above:
 
 - **Readiness and liveness probes** — The Conforma Wrapper exposes two health endpoints that Kubernetes uses to manage pod lifecycle and traffic routing:
-  - *Liveness* (`GET /healthz`) — returns 200 if the process is alive. Kubernetes restarts the pod if this probe fails (e.g. deadlock, unrecoverable panic). The check is lightweight: it confirms the HTTP server loop is responsive and, optionally, that the OIDC JWKS cache is populated.
-  - *Readiness* (`GET /readyz`) — returns 200 when the pod can accept new work, and 503 when it cannot. The readiness check is tied to the concurrency semaphore: when all permits are in use, the endpoint returns 503, signalling Kubernetes to remove the pod from the Service's endpoint list. New requests are then routed only to pods that still have capacity. Once a permit is released, the probe returns 200 and the pod re-enters the rotation. This provides cluster-level backpressure that is transparent to Trustify — the K8s Service load-balances across ready pods automatically, reducing the likelihood of 429 responses reaching the caller. A 429 is still returned as a last resort if a request arrives between a readiness check and semaphore exhaustion.
+  - _Liveness_ (`GET /healthz`) — returns 200 if the process is alive. Kubernetes restarts the pod if this probe fails (e.g. deadlock, unrecoverable panic). The check is lightweight: it confirms the HTTP server loop is responsive and, optionally, that the OIDC JWKS cache is populated.
+  - _Readiness_ (`GET /readyz`) — returns 200 when the pod can accept new work, and 503 when it cannot. The readiness check is tied to the concurrency semaphore: when all permits are in use, the endpoint returns 503, signalling Kubernetes to remove the pod from the Service's endpoint list. New requests are then routed only to pods that still have capacity. Once a permit is released, the probe returns 200 and the pod re-enters the rotation. This provides cluster-level backpressure that is transparent to Trustify — the K8s Service load-balances across ready pods automatically, reducing the likelihood of 429 responses reaching the caller. A 429 is still returned as a last resort if a request arrives between a readiness check and semaphore exhaustion.
 - **Horizontal Pod Autoscaler (HPA)** — The Wrapper Deployment can be configured with an HPA that scales replicas based on CPU/memory utilization or a custom metric such as the in-flight validation count exposed via a `/metrics` endpoint. Because the readiness probe already removes saturated pods from the Service, the HPA's scaling decisions and the readiness-driven traffic shifting work together: the HPA adds capacity while readiness prevents overload on existing pods. This allows the cluster to absorb demand spikes without requiring a centralized queue.
 - **Resource limits and requests** — Each Wrapper pod should declare CPU and memory `requests` and `limits` that account for the peak resource usage of the CLI subprocess (the semaphore concurrency multiplied by the per-process footprint). This prevents a burst of validations from starving other workloads on the node.
 - **NetworkPolicy** — A Kubernetes `NetworkPolicy` can restrict ingress to the Wrapper pods so that only Trustify pods (selected by label) are allowed to reach the `/api/v1/validate` endpoint. This provides a network-layer defense-in-depth on top of the OIDC-based authentication, ensuring that even if a valid token were leaked, it could not be used from outside the trusted namespace.
