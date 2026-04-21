@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1776674536658,
+  "lastUpdate": 1776759159783,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -15252,6 +15252,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jim@crossleys.org",
+            "name": "Jim Crossley",
+            "username": "jcrossley3"
+          },
+          "committer": {
+            "email": "jim@crossleys.org",
+            "name": "Jim Crossley",
+            "username": "jcrossley3"
+          },
+          "distinct": true,
+          "id": "b382aacdc5543861b5a0ac36e9932ae84d9f6119",
+          "message": "Add more tests per review",
+          "timestamp": "2026-04-20T12:56:38Z",
+          "tree_id": "2c4dd8e61e2ca6eb2992705c4b532638f24b6978",
+          "url": "https://github.com/gildub/trustify/commit/b382aacdc5543861b5a0ac36e9932ae84d9f6119"
+        },
+        "date": 1776759157824,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 10,
             "unit": "s"
           }
         ]
