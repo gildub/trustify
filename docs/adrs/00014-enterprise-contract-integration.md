@@ -1,16 +1,16 @@
 # 00014. Enterprise Contract Integration
 
-Date: 2026-02-03
+Date: 2026-05-15
 
 ## Status
 
-APPROVED
+PROPOSED (supersedes previous APPROVED revision dated 2026-02-03)
 
 ## Context
 
 Trustify provides SBOM storage, analysis, and vulnerability tracking but lacks automated policy enforcement. Organizations need to validate SBOMs against security and compliance policies (licensing, vulnerabilities, provenance) without relying on manual, inconsistent review processes.
 
-Conforma (former Enterprise Contract) is an open-source policy enforcement tool actively maintained by Red Hat. It validates SBOMs against configurable policies and produces structured JSON output. Currently it provides only a CLI; a REST API is planned but with no committed timeline.
+Conforma (former Enterprise Contract) is an open-source policy enforcement tool actively maintained by Red Hat. It validates SBOMs against configurable policies and produces structured JSON output. Conforma is developing a REST API; this ADR targets that API as the integration point.
 
 ### Requirements
 
@@ -25,42 +25,40 @@ Users need the ability to:
 
 ## Decision
 
-We will integrate Conforma into Trustify as a user triggered validation service by interacting with Conforma CLI.  
-Validation is manually triggered — not automatic on SBOM upload.  
+Integrate Conforma into Trustify as a user-triggered validation service by communicating directly with the Conforma REST API.
+Validation is manually triggered — not automatic on SBOM upload.
 Trustify stores information to identify (id, name, URL) of Policies.
 
-Conforma CLI is deployed separately from Trustify as either a standalone container or equivalent.
+Conforma is assumed to be deployed separately from Trustify as a standalone service.
 
-A Conforma Wrapper (HTTP service) will act as a proxy between Trustify's Policy Verifier service and Conforma CLI.
+Trustify's Policy Verifier service communicates directly with the Conforma API over HTTP to submit validation requests and poll for results.
 
-### The Conforma HTTP Wrapper
+### Why a separate Conforma service
 
-Policy validation can be be very resource-intensive, especially for large SBOMs with thousands of packages, and it requires a dedicated environment and having the Conforma HTTP Wrapper running alongside the Conforma CLI provides :
+Policy validation can be very resource-intensive, especially for large SBOMs with thousands of packages, and running it in a dedicated service provides:
 
-- **Resource isolation** — A long-running or memory-heavy Conforma process cannot degrade Trustify's responsiveness.
-- **Independent scaling** — The Conforma Wrapper can be scaled horizontally (more replicas) based on validation demand without scaling the entire Trustify deployment. Conversely, Trustify can scale for query load without provisioning excess capacity for validation.
-- **Failure containment** — An Conforma CLI crash (OOM kill, policy fetch timeout, unexpected CLI error) is isolated to the wrapper which will propagate back to Trustify the failure; This is a terminal state where the user will need to queue a new validation. In case the wrapper crashed, a timeout period will force Trustify to change the state of the queued validations to "Failed".
-- **Version independence** — The Conforma Wrapper and Conforma CLI can be upgraded or rolled back on their own release cadence, without redeploying Trustify. This is important given Conforma's active development pace.
+- **Resource isolation** — A long-running or memory-heavy validation cannot degrade Trustify's responsiveness.
+- **Independent scaling** — The Conforma service can be scaled horizontally based on validation demand without scaling the entire Trustify deployment. Conversely, Trustify can scale for query load without provisioning excess capacity for validation.
+- **Failure containment** — A Conforma service failure (OOM kill, policy fetch timeout, internal error) is isolated from Trustify. Trustify detects failures via polling and transitions the validation to a terminal `failed` state. The user can then queue a new validation.
+- **Version independence** — The Conforma service can be upgraded or rolled back on its own release cadence, without redeploying Trustify. This is important given Conforma's active development pace.
 
 ### Validation process state
 
-Each SBOM + policy pair has two validation states
+Each SBOM + policy pair has two validation states.
 
-The validation process state of the
-
-To track the progress of the external validation process through the Conforma HTTP Wrapper, the following states are used :
+To track the progress of the external validation through the Conforma API, the following states are used:
 
 - **Queued** — a user has triggered validation; the request is being processed. Other users can see this state, preventing duplicate validation runs for the same SBOM + policy pair.
-- **In Progress** — the request has been submitted to Conforma Wrapper.
-- **Completed** — the outcome of the request has been received back from Conforma Wrapper.
-- **Failed** — an execution error occurred (CLI crash, policy fetch failure, timeout). This is a terminal state; the error is surfaced to the user, who may manually queue a new validation run.
+- **In Progress** — the request has been submitted to the Conforma API.
+- **Completed** — the outcome has been received from the Conforma API.
+- **Failed** — an execution error occurred (API error, policy fetch failure, timeout). This is a terminal state; the error is surfaced to the user, who may manually queue a new validation run.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Queued : User triggers validation<br/>INSERT() ON CONFLICT DO NOTHING
-    Queued --> InProgress : Request submitted to <br/>Conforma Wrapper
-    InProgress --> Completed : Outcome received
-    InProgress --> Failed : Execution error<br/>(crash, timeout, fetch failure)
+    Queued --> InProgress : Request submitted to <br/>Conforma API
+    InProgress --> Completed : Outcome received<br/>via polling
+    InProgress --> Failed : Execution error<br/>(API error, timeout, fetch failure)
     Completed --> [*] : Update validation result <br/>(pass, fail or error)
     Failed --> [*]
 ```
@@ -69,33 +67,53 @@ The result of a Policy validation is updated only when the validation process is
 
 ### What is stored where
 
-- PostgreSQL: validation process state (`status`), validation outcome (`status`), structured results (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, status.
+- PostgreSQL: validation process state (`status`), validation outcome (`result`), structured results (JSONB), summary statistics, foreign keys to SBOM and policy. Indexed on sbom_id, status.
 - Storage system: full raw Conforma JSON report, linked from the DB row via `source_document.id`. Keeps DB rows small while preserving audit completeness.
-- Not stored: the policy definitions themselves. policy stores references (URLs, OCI refs) that Conforma fetches at runtime.
+- Not stored: the policy definitions themselves. Policy stores references (URLs, OCI refs) that Conforma fetches at runtime.
 
 Storing full JSON in storage system rather than only a summary was chosen explicitly to preserve audit completeness — callers can always fetch the raw report. The DB results JSONB holds enough structure for filtering and dashboards without duplicating the full payload.
 
 ## Consequences
 
-### Conforma HTTP Wrapper
+### Direct API Integration
 
-It's deployed separatly alongside the Conforma CLI instance, monitored, and maintained as a separate component.
+Trustify communicates directly with the Conforma REST API — no intermediary wrapper or CLI process spawning is involved. The Policy Verifier service in Trustify acts as an HTTP client to the Conforma API.
 
-In Kubernetes or standalone machine deployments, the Conforma Wrapper pod has its own resource requests/limits, independent of the Trustify pod.
+The Conforma API contract expected by Trustify is documented in the [Expected Conforma API Contract](#expected-conforma-api-contract) section below; the actual contract will be finalized in collaboration with the Conforma team.
 
-### CLI spawning
+### Polling-based result retrieval
 
-Within the Conforma Wrapper, Conforma is invoked via CLI spawning rather than a native API. This introduces an operational dependency (Conforma must be installed and version-pinned on every Conforma Wrapper instance) and per-validation process spawning overhead. These are accepted trade-offs given that no Conforma REST API exists yet. On the Trustify side, the Policy Verifier service interacts with the Conforma Wrapper over HTTP and is built behind an adapter interface, so the implementation can be swapped for a direct Conforma REST client when one becomes available, without changes to the service layer or API.
+Trustify uses a background poller to retrieve validation results from the Conforma API. The poller runs as a recurring task within Trustify's Policy Verifier service:
+
+1. On each tick (default interval: 15 seconds), it queries for all `policy_validation` rows with `status = 'in_progress'`.
+2. For each in-progress validation, it calls the Conforma API status endpoint to check whether the job has completed.
+3. If completed, it fetches the full result, parses it, persists the outcome and the raw report, and transitions the row to `completed`.
+4. If the Conforma API reports a failure, the row is transitioned to `failed` with the error detail.
+5. If the validation has been `in_progress` longer than the configured timeout (default: 5 minutes, overridable per-policy via `timeout_seconds`), the row is transitioned to `failed` with `"Validation timed out"`.
+
+This approach is simpler than a callback model because:
+
+- Conforma does not need to know Trustify's API or authenticate back to it.
+- No bidirectional OIDC configuration is required.
+- Trustify controls the polling frequency and timeout behavior entirely.
+- Network topology is simpler: only Trustify → Conforma traffic, no reverse path.
 
 ### Alternatives Considered
+
+#### CLI + HTTP Wrapper: Superseded
+
+The previous revision of this ADR (dated 2026-02-03) proposed a Conforma HTTP Wrapper — a custom HTTP service deployed alongside the Conforma CLI that would accept validation requests, spawn `ec validate` as a subprocess, and POST results back to Trustify via a callback endpoint. This approach was approved when no Conforma REST API existed but introduced significant operational complexity:
+
+- A custom wrapper service to develop, deploy, monitor, and maintain.
+- CLI process spawning with per-validation overhead and OOM/crash risks.
+- A bidirectional OIDC configuration (Trustify → Wrapper and Wrapper → Trustify).
+- A callback endpoint on Trustify requiring dedicated authentication.
+
+The Conforma REST API eliminates all of these concerns by providing a standard, well-defined integration point that Trustify can consume as an HTTP client.
 
 #### In-Process Policy Engine: Rejected
 
 Reimplementing Enterprise Contract logic in Rust would diverge from upstream and create significant maintenance burden.
-
-#### Direct Integration: Rejected
-
-Couple validation integrated within Trustify service through a directly controlled component was simpler but worse for large-scale deployments.
 
 #### Embedded WASM Module: Rejected
 
@@ -103,7 +121,7 @@ Conforma is not available as WASM and would require major upstream changes.
 
 #### Batch Processing Queue: Deferred
 
-A Redis/RabbitMQ queue would improve retry handling and priority management; implement if the 429-based rejection approach proves insufficient under real load.
+A Redis/RabbitMQ queue would improve retry handling and priority management; implement if the polling-based approach proves insufficient under real load.
 
 ## Details
 
@@ -116,11 +134,11 @@ C4Context
     Person(user, "Trustify User", "Analyst validating SBOMs")
 
     System(trustify, "Trustify", "RHTPA")
-    System_Ext(conforma, "Conforma", "Enterprise Contract policy validation tool")
+    System_Ext(conforma, "Conforma API", "Enterprise Contract policy validation service")
     System_Ext(policyRepo, "Policy Repository", "Git repository or storage containing EC policies")
 
     Rel(user, trustify, "Request compliance<br/>View compliance status", "API/GUI")
-    Rel(trustify, conforma, "Triggers policy validation", "HTTP API")
+    Rel(trustify, conforma, "Submit validation<br/>Poll for results", "HTTP API")
     Rel(conforma, policyRepo, "Fetches policies", "Git/HTTPS")
 
     UpdateRelStyle(user, trustify, $offsetX="-50", $offsetY="20")
@@ -140,47 +158,42 @@ C4Container
         Container(webui, "Web UI", "Rust/Actix", "Trustify GUI")
         Container(api, "API Gateway", "Actix-web", "REST API endpoints for SBOM <br/> and compliance operations")
         ContainerDb(postgres, "PostgreSQL", "DBMS", "Stores SBOM metadata, relationships, <br/>and EC validation results")
-        Container(policyValidationModule, "Policy Validation Module", "Rust", "Orchestrates validation via<br/>Conforma Wrapper and persists results")
+        Container(policyValidationModule, "Policy Validation Module", "Rust", "Orchestrates validation via<br/>Conforma API and persists results")
         ContainerDb(s3, "Object Storage", "S3/Minio", "Stores SBOM documents and EC reports")
         Container(storage, "Storage Service", "Rust", "Manages document storage<br/>(SBOMs, policy results)")
     }
 
     Container_Boundary(conformaSystem, "Conforma System") {
-        Container(conformaWrapper, "Conforma Wrapper", "Rust/Actix", "HTTP Wrapper")
-        System_Ext(conforma, "Conforma CLI", "External policy validation tool")
+        Container(conformaApi, "Conforma API", "REST Service", "Policy validation service")
     }
 
     Container_Boundary(policySystem, "Policy System") {
         System_Ext(policyRepo, "Policy Repository", "Git repository with EC policies")
     }
 
-    Container_Boundary(oidc, "OIDC") {
-        System_Ext(oidc, "OIDC", "OPenID Connect OAuth 2.0
-        ", "")
+    Container_Boundary(oidcBoundary, "OIDC") {
+        System_Ext(oidc, "OIDC", "OpenID Connect OAuth 2.0")
     }
 
     Rel(user, webui, "Views compliance status", "HTTP API")
     Rel(user, api, "Views compliance status", "HTTP API")
     Rel(webui, api, "API calls", "JSON/HTTP API")
     Rel(api, policyValidationModule, "Triggers validation", "Function call")
-    Rel(policyValidationModule, conformaWrapper, "POST /api/v1/validate", "HTTP API formData")
-    Rel(conformaWrapper, api, "POST /api/v2/policy/{id}/validation/{validation_id}/result", "HTTP API")
-    Rel(conformaWrapper, conforma, "ec validate input {SBOM} {policy}", "Spawned command")
+    Rel(policyValidationModule, conformaApi, "POST /validate<br/>GET /validate/{id}", "HTTP API")
     Rel(policyValidationModule, postgres, "Saves validation<br/>results", "SQL")
     Rel(policyValidationModule, storage, "Stores EC reports", "Function call")
     Rel(storage, s3, "Persists reports", "S3 API")
-    Rel(conforma, policyRepo, "Fetches policies", "Git/HTTPS")
-    Rel(conformaWrapper, oidc, "Authenticate", "OAuth API")
+    Rel(conformaApi, policyRepo, "Fetches policies", "Git/HTTPS")
+    Rel(policyValidationModule, oidc, "Obtain token", "OAuth API")
 
     UpdateRelStyle(user, webui, $offsetX="-60", $offsetY="30")
     UpdateRelStyle(user, api, $offsetX="-60", $offsetY="-50")
     UpdateRelStyle(webui, api, $offsetX="-40", $offsetY="10")
-    UpdateRelStyle(policyValidationModule, conformaWrapper, $offsetX="-50", $offsetY="-20")
-    UpdateRelStyle(conformaWrapper, api, $offsetX="-60", $offsetY="-10")
+    UpdateRelStyle(policyValidationModule, conformaApi, $offsetX="-50", $offsetY="-20")
     UpdateRelStyle(policyValidationModule, postgres, $offsetX="-40", $offsetY="10")
     UpdateRelStyle(storage, s3, $offsetX="-40", $offsetY="10")
-    UpdateRelStyle(conforma, policyRepo, $offsetX="-40", $offsetY="100")
-    UpdateRelStyle(conformaWrapper, oidc, $offsetX="30", $offsetY="40")
+    UpdateRelStyle(conformaApi, policyRepo, $offsetX="-40", $offsetY="100")
+    UpdateRelStyle(policyValidationModule, oidc, $offsetX="30", $offsetY="40")
 
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
@@ -195,46 +208,43 @@ C4Component
         Container(api, "API Gateway", "Actix-web", "REST API for EC operations")
         Container_Boundary(policyValidationModule, "Policy Validation Module") {
             Container(policyEndpoints, "Policy Endpoints", "Actix-web handlers", "REST endpoints for validation operations")
-            Component(policyVeriferService, "Policy Verifier service", "Business logic", "Orchestrates validation workflow")
+            Component(policyVerifierService, "Policy Verifier service", "Business logic", "Orchestrates validation workflow")
             Component(resultParser, "Result Parser", "JSON parser", "Parses Conforma output into structured data")
             Component(policyManager, "Policy Manager", "Business logic", "Manages EC policy references and<br/>configuration")
             Component(resultPersistence, "Result Persistence", "Database layer", "Saves validation results")
+            Component(validationPoller, "Validation Poller", "Background task", "Polls Conforma API for<br/>in-progress validation results")
+            Component(conformaClient, "Conforma Client", "HTTP client", "Communicates with<br/>Conforma REST API")
         }
     }
     Deployment_Node(external, "External System") {
-        Deployment_Node(trustifyPod, "Trustify Pod") {
-            Component(conformaWrapper, "Conforma Wrapper", "Actix-web handlers", "HTTP API")
-        }
-        Deployment_Node(conformaPod, "Conforma Pod") {
-            System_Ext(conforma, "Conforma CLI", "Enterprise Contract validation tool")
-        }
+        System_Ext(conformaApi, "Conforma API", "Enterprise Contract validation service")
     }
 
     Container_Boundary(dbms, "Database") {
         ContainerDb(postgres, "PostgreSQL", "Database", "Stores validation results and policy references")
     }
+
     Container_Boundary(storage, "S3 System") {
         System_Ext(s3, "S3 Object Storage", "Stores SBOM documents and reports")
     }
 
-    Rel(api, policyEndpoints, "POST /api/v2/policy/{id}/validation,\nGET /api/v2/policy/{id}/validation/report,\nGET /api/v2/policy/{id}/validation/report/history,\nGET /api/v2/policy/{id}/validation/report/{result_id},\nPOST /api/v2/policy/{id}/validation/{validation_id}/result", "JSON/HTTPS")
-    Rel(policyEndpoints, policyVeriferService, "validate_sbom() / get_ec_report()", "Function call")
-    Rel(policyVeriferService, policyManager, "get_policy_config()", "Function call")
+    Rel(api, policyEndpoints, "POST /api/v2/policy/{id}/validation,\nGET /api/v2/policy/{id}/validation/report,\nGET /api/v2/policy/{id}/validation/report/history,\nGET /api/v2/policy/{id}/validation/report/{result_id}", "JSON/HTTPS")
+    Rel(policyEndpoints, policyVerifierService, "validate_sbom() / get_ec_report()", "Function call")
+    Rel(policyVerifierService, policyManager, "get_policy_config()", "Function call")
     Rel(policyManager, postgres, "SELECT policy", "SQL")
-    Rel(policyVeriferService, conformaWrapper, "POST /api/v1/validate → returns {id}", "HTTP")
-    Rel(conformaWrapper, conforma, "ec validate", "Process spawn")
-    Rel(conformaWrapper, api, "POST /api/v2/policy/{id}/validation/{validation_id}/result", "JSON/HTTPS")
-    Rel(policyVeriferService, resultParser, "parse_output()", "Function call")
-    Rel(policyVeriferService, resultPersistence, "save_results()", "Function call")
-    Rel(resultPersistence, postgres, "INSERT policy_validation", "SQL")
-    Rel(policyVeriferService, s3, "Store EC report", "S3 API")
+    Rel(policyVerifierService, conformaClient, "submit_validation()", "Function call")
+    Rel(conformaClient, conformaApi, "POST /validate\nGET /validate/{id}", "HTTP")
+    Rel(validationPoller, conformaClient, "check_status()", "Function call")
+    Rel(validationPoller, resultParser, "parse_output()", "Function call")
+    Rel(validationPoller, resultPersistence, "save_results()", "Function call")
+    Rel(resultPersistence, postgres, "INSERT/UPDATE policy_validation", "SQL")
+    Rel(policyVerifierService, s3, "Store EC report", "S3 API")
 
     UpdateRelStyle(api, policyEndpoints, $offsetX="-50", $offsetY="-50")
-    UpdateRelStyle(policyEndpoints, policyVeriferService, $offsetX="-60", $offsetY="+40")
-    UpdateRelStyle(policyVeriferService, conformaWrapper, $offsetX="-20", $offsetY="10")
-    UpdateRelStyle(conformaWrapper, api, $offsetX="20", $offsetY="-40")
-    UpdateRelStyle(policyVeriferService, resultParser, $offsetX="-60", $offsetY="+0")
-    UpdateRelStyle(policyVeriferService, resultPersistence, $offsetX="-60", $offsetY="+80")
+    UpdateRelStyle(policyEndpoints, policyVerifierService, $offsetX="-60", $offsetY="+40")
+    UpdateRelStyle(policyVerifierService, conformaClient, $offsetX="-20", $offsetY="10")
+    UpdateRelStyle(policyVerifierService, resultParser, $offsetX="-60", $offsetY="+0")
+    UpdateRelStyle(policyVerifierService, resultPersistence, $offsetX="-60", $offsetY="+80")
 
     UpdateLayoutConfig($c4ShapeInRow="3", $c4BoundaryInRow="2")
 ```
@@ -251,7 +261,8 @@ sequenceDiagram
     participant PM as Policy Manager
     participant DB as PostgreSQL
     participant S3 as Object Storage
-    participant Wrapper as Conforma Wrapper (HTTP)
+    participant CC as Conforma Client
+    participant CA as Conforma API
 
     User->>API: POST /api/v2/policy/<policy_id>/validation?sbom_id=<sbom_id>
     API->>EP: dispatch request
@@ -282,58 +293,67 @@ sequenceDiagram
     VS->>S3: retrieve_sbom_document(sbom_id)
     S3-->>VS: SBOM document (JSON/XML)
 
-    VS->>Wrapper: POST /api/v1/validate {SBOM, policy_ref}
-    Wrapper-->>VS: 202 Accepted {validation_id}
+    VS->>CC: submit_validation(sbom, policy_config)
+    CC->>CA: POST /validate {sbom, policy_ref, policy_paths, ...}
+    CA-->>CC: 202 Accepted {job_id}
+    CC-->>VS: job_id
 
-    VS->>DB: INSERT policy_validation (status='in_progress', status='pending', sbom_id, policy_id, validation_id, ...)
+    VS->>DB: INSERT policy_validation (status='in_progress', result='pending', sbom_id, policy_id, conforma_job_id, ...)
     VS-->>EP: 202 Accepted {validation_id}
     EP-->>API: 202 Accepted {validation_id}
     API-->>User: 202 Accepted {validation_id}
 ```
 
-### Sequence Diagram — Async Validation Processing
+### Sequence Diagram — Async Result Polling
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant API as Trustify API
-    participant EP as Policy Endpoints
-    participant VS as Policy Verifier service
+    participant Poller as Validation Poller
+    participant CC as Conforma Client
+    participant CA as Conforma API
+    participant RP as Result Parser
     participant DB as PostgreSQL
     participant S3 as Object Storage
-    participant Wrapper as Conforma Wrapper (HTTP)
-    participant Conf as Conforma CLI
-    participant OIDC as OIDC Provider
 
-    Note over Wrapper: Wrapper holds validation_id from the initial request
+    Note over Poller: Background task runs every 15s
 
-    Wrapper->>Wrapper: Write SBOM to temp file
-    Wrapper->>Conf: ec validate input --file "$SBOM_PATH" --policy <URL> --output json --show-successes --info
+    Poller->>DB: SELECT * FROM policy_validation WHERE status = 'in_progress'
+    DB-->>Poller: [validation_1, validation_2, ...]
 
-    alt Exit code 0 — pass
-        Conf-->>Wrapper: {result: "PASS", violations: []}
-    else Exit code 1 — fail (policy violations)
-        Conf-->>Wrapper: {result: "FAIL", violations: [{rule, severity, message}]}
-    else Exit code 2+ — execution error
-        Conf-->>Wrapper: stderr: "Policy file not found"
-    end
+    loop For each in-progress validation
+        Poller->>CC: check_status(conforma_job_id)
+        CC->>CA: GET /validate/{job_id}
 
-    Wrapper->>Wrapper: Cleanup temp files
-    Wrapper->>API: POST /api/v2/policy/{id}/validation/{validation_id}/result {conforma JSON output}<br/>Authorization: Bearer <access_token>
-    API->>EP: dispatch callback
-    EP->>VS: process_validation_result(validation_id, result)
-
-    alt Pass
-        VS->>DB: UPDATE policy_validation SET status='completed', result='pass', results=[]
-        VS->>S3: store_validation_report(result_id, full_json)
-        VS->>DB: UPDATE SET source_document.id = ?
-    else Fail
-        VS->>DB: UPDATE policy_validation SET status='completed', result='fail', results=json
-        VS->>S3: store_validation_report(result_id, full_json)
-        VS->>DB: UPDATE SET source_document.id = ?
-    else Error
-        VS->>DB: UPDATE policy_validation SET status='completed', result='error', error_message=detail
-        Note over VS,DB: Failed is terminal. User may manually queue a new validation (new row).
+        alt Job completed — pass
+            CA-->>CC: {status: "completed", result: {success: true, ...}}
+            CC-->>Poller: ConformaResult
+            Poller->>RP: parse_output(conforma_result)
+            RP-->>Poller: ParsedResult {result, results[], summary}
+            Poller->>DB: UPDATE policy_validation SET status='completed', result='pass', results=json
+            Poller->>S3: store_validation_report(validation_id, full_json)
+            Poller->>DB: UPDATE SET source_document_id = ?
+        else Job completed — fail (policy violations)
+            CA-->>CC: {status: "completed", result: {success: false, violations: [...]}}
+            CC-->>Poller: ConformaResult
+            Poller->>RP: parse_output(conforma_result)
+            RP-->>Poller: ParsedResult {result, results[], summary}
+            Poller->>DB: UPDATE policy_validation SET status='completed', result='fail', results=json
+            Poller->>S3: store_validation_report(validation_id, full_json)
+            Poller->>DB: UPDATE SET source_document_id = ?
+        else Job failed — execution error
+            CA-->>CC: {status: "failed", error: "Policy file not found"}
+            CC-->>Poller: Error
+            Poller->>DB: UPDATE policy_validation SET status='failed', result='error', error_message=detail
+        else Job still running
+            CA-->>CC: {status: "running"}
+            Note over Poller: Check timeout
+            alt Exceeded timeout
+                Poller->>DB: UPDATE policy_validation SET status='failed', error_message='Validation timed out'
+            else Within timeout
+                Note over Poller: Skip, will check again next tick
+            end
+        end
     end
 ```
 
@@ -356,13 +376,12 @@ sequenceDiagram
 | `auth`                 | object   | no              | Credentials for private repos; sensitive values encrypted via `ring::aead` AES-256-GCM (never logged) |
 | `auth.type`            | string   | yes (if `auth`) | `"token"`, `"ssh_key"`, or `"none"`                                                                   |
 | `auth.token_encrypted` | string   | no              | AES-256-GCM encrypted bearer/PAT token, prefixed with encryption scheme                               |
-| `policy_paths`         | string[] | no              | Sub-paths within the repo to evaluate (maps to Conforma `--policy` source paths)                      |
+| `policy_paths`         | string[] | no              | Sub-paths within the repo to evaluate                                                                 |
 | `exclude`              | string[] | no              | Rule codes to skip during validation                                                                  |
 | `include`              | string[] | no              | If non-empty, only these rule codes are evaluated                                                     |
 | `timeout_seconds`      | integer  | no              | Per-policy override of the default 5-minute execution timeout                                         |
-| `extra_args`           | string[] | no              | Additional CLI flags forwarded verbatim to Conforma                                                   |
 
-`policy.configuration` example :
+`policy.configuration` example:
 
 ```json
 {
@@ -374,8 +393,7 @@ sequenceDiagram
   "policy_paths": ["policy/lib", "policy/release"],
   "exclude": ["hello_world.minimal_packages"],
   "include": [],
-  "timeout_seconds": 300,
-  "extra_args": ["--strict"]
+  "timeout_seconds": 300
 }
 ```
 
@@ -384,6 +402,7 @@ sequenceDiagram
 - `id` (UUID, PK)
 - `sbom_id` (UUID, FK → sbom)
 - `policy_id` (UUID, FK → policy)
+- `conforma_job_id` (VARCHAR) - Job ID returned by the Conforma API, used for polling
 - `status` (ENUM) - 'null', 'queued', 'in_progress', 'completed', 'failed'
 - `error`(TEXT) - Error message
 - `result` (ENUM) - 'null', 'fail', 'pass' or 'error'
@@ -400,15 +419,15 @@ sequenceDiagram
 
 **`policy_validation.results` JSONB model:**
 
-| Field                  | Type   | Required | Description                                             |
-| ---------------------- | ------ | -------- | ------------------------------------------------------- |
-| `severity`             | string | yes      | `"violation"`, `"warning"`, or `"success"`              |
-| `msg`                  | string | yes      | Human-readable message describing the check outcome     |
-| `metadata`             | object | yes      | Rule metadata, preserved as-is from Conforma CLI output |
-| `metadata.code`        | string | yes      | Rule identifier for filtering and deduplication         |
-| `metadata.title`       | string | yes      | Short rule title                                        |
-| `metadata.description` | string | no       | Detailed explanation of what the rule checks            |
-| `metadata.solution`    | string | no       | Suggested remediation (absent for successes)            |
+| Field                  | Type   | Required | Description                                         |
+| ---------------------- | ------ | -------- | --------------------------------------------------- |
+| `severity`             | string | yes      | `"violation"`, `"warning"`, or `"success"`          |
+| `msg`                  | string | yes      | Human-readable message describing the check outcome |
+| `metadata`             | object | yes      | Rule metadata, preserved as-is from Conforma output |
+| `metadata.code`        | string | yes      | Rule identifier for filtering and deduplication     |
+| `metadata.title`       | string | yes      | Short rule title                                    |
+| `metadata.description` | string | no       | Detailed explanation of what the rule checks        |
+| `metadata.solution`    | string | no       | Suggested remediation (absent for successes)        |
 
 `policy_validation.results` example:
 
@@ -450,7 +469,7 @@ sequenceDiagram
 
 | Field              | Type   | Required | Description                                |
 | ------------------ | ------ | -------- | ------------------------------------------ |
-| `conforma_version` | string | yes      | Version of Conforma CLI (e.g. `"v0.8.83"`) |
+| `conforma_version` | string | yes      | Version of Conforma API (e.g. `"v0.8.83"`) |
 
 `policy_validation.type_metadata` example:
 
@@ -523,8 +542,6 @@ struct PolicyConfiguration {
     include: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     timeout_seconds: Option<u32>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    extra_args: Vec<String>,
 }
 ```
 
@@ -543,6 +560,9 @@ struct PolicyValidation {
     id: String,
     sbom_id: String,
     policy_id: String,
+    /// Job ID from the Conforma API, used for polling
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    conforma_job_id: Option<String>,
     /// Lifecycle: `'null'`, `'queued'`, `'in_progress'`, `'completed'`, `'failed'`
     status: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -622,7 +642,6 @@ POST   /api/v2/policy/{id}/validation                                  # Trigger
 GET    /api/v2/policy/{id}/validation/report                           # Get latest validation result
 GET    /api/v2/policy/{id}/validation/report/history                   # Get validation history
 GET    /api/v2/policy/{id}/validation/report/{result_id}               # Download full report
-POST   /api/v2/policy/{id}/validation/{validation_id}/result           # Callback for validation result
 ```
 
 ### Permissions
@@ -633,7 +652,7 @@ The policy module introduces the following permissions, following the existing T
 | --------------- | ------------------------------------------------------------------ |
 | `create.policy` | Create policy references and trigger validations                   |
 | `read.policy`   | List/get policy references and read validation results and reports |
-| `update.policy` | Update policy references and post validation results (callback)    |
+| `update.policy` | Update policy references                                           |
 | `delete.policy` | Delete policy references                                           |
 
 These permissions map to the default OIDC scope groups:
@@ -647,20 +666,17 @@ These permissions map to the default OIDC scope groups:
 
 Endpoint permission requirements:
 
-| Endpoint                                                     | Permission      |
-| ------------------------------------------------------------ | --------------- |
-| `POST /api/v2/policy`                                        | `create.policy` |
-| `GET /api/v2/policy`                                         | `read.policy`   |
-| `GET /api/v2/policy/{id}`                                    | `read.policy`   |
-| `PUT /api/v2/policy/{id}`                                    | `update.policy` |
-| `DELETE /api/v2/policy/{id}`                                 | `delete.policy` |
-| `POST /api/v2/policy/{id}/validation`                        | `create.policy` |
-| `GET /api/v2/policy/{id}/validation/report`                  | `read.policy`   |
-| `GET /api/v2/policy/{id}/validation/report/history`          | `read.policy`   |
-| `GET /api/v2/policy/{id}/validation/report/{result_id}`      | `read.policy`   |
-| `POST /api/v2/policy/{id}/validation/{validation_id}/result` | `update.policy` |
-
-The Conforma Wrapper's OIDC client (see [Conforma Wrapper OIDC Configuration](#conforma-wrapper-oidc-configuration)) should be registered with the minimal scope required — only `update:document` (granting `update.policy`) — so it can post results to the callback endpoint.
+| Endpoint                                                | Permission      |
+| ------------------------------------------------------- | --------------- |
+| `POST /api/v2/policy`                                   | `create.policy` |
+| `GET /api/v2/policy`                                    | `read.policy`   |
+| `GET /api/v2/policy/{id}`                               | `read.policy`   |
+| `PUT /api/v2/policy/{id}`                               | `update.policy` |
+| `DELETE /api/v2/policy/{id}`                            | `delete.policy` |
+| `POST /api/v2/policy/{id}/validation`                   | `create.policy` |
+| `GET /api/v2/policy/{id}/validation/report`             | `read.policy`   |
+| `GET /api/v2/policy/{id}/validation/report/history`     | `read.policy`   |
+| `GET /api/v2/policy/{id}/validation/report/{result_id}` | `read.policy`   |
 
 ### POST `/api/v2/policy`
 
@@ -793,7 +809,7 @@ Deleting a policy will fail if there are validation results referencing it.
 
 ### POST `/api/v2/policy/{id}/validation`
 
-Trigger policy validation for a given SBOM. The validation is performed asynchronously by the Conforma Wrapper; a `validation_id` is returned immediately.
+Trigger policy validation for a given SBOM. The validation is performed asynchronously via the Conforma API; a `validation_id` is returned immediately.
 
 If a validation is already in progress for the same SBOM + policy pair, the request is rejected with 409 Conflict.
 
@@ -819,7 +835,8 @@ If a validation is already in progress for the same SBOM + policy pair, the requ
 - 403 - if the user was authenticated but not authorized
 - 404 - if the SBOM or policy was not found
 - 409 - if a validation is already in progress for this SBOM + policy pair
-- 429 - if the Conforma Wrapper has reached its concurrency limit
+- 502 - if the Conforma API is unreachable or returned an unexpected error
+- 503 - if the Conforma API reported it cannot accept work at this time
 
 ### GET `/api/v2/policy/{id}/validation/report`
 
@@ -900,65 +917,67 @@ Download the full raw Conforma JSON report from storage.
 - 403 - if the user was authenticated but not authorized
 - 404 - if the validation result or report was not found
 
-### POST `/api/v2/policy/{id}/validation/{validation_id}/result`
+## Expected Conforma API Contract
 
-Callback endpoint used by the Conforma Wrapper to post the validation result back to Trustify after Conforma CLI execution completes.
+The following API contract is what Trustify expects from the Conforma REST API. This contract is aspirational and subject to change once the Conforma API is finalized. Trustify's Conforma client adapter is built behind a trait interface so the implementation can be adjusted to match the actual API without changes to the service layer.
 
-This endpoint is not intended for end-user use. Because Trustify enforces OAuth 2.0 authentication on all API endpoints, the Conforma Wrapper must present a valid Bearer token obtained via the **OAuth 2.0 Client Credentials Grant** (see [Conforma Wrapper OIDC Configuration](#conforma-wrapper-oidc-configuration) below).
+### POST `/validate`
 
-#### Request
-
-| part   | name            | type     | description                                                                            |
-| ------ | --------------- | -------- | -------------------------------------------------------------------------------------- |
-| path   | `id`            | `String` | Policy id; must match the policy under which the validation was started                |
-| path   | `validation_id` | `String` | ID of the validation (returned in the 202 response)                                    |
-| header | `Authorization` | `String` | `Bearer <access_token>` — token obtained from the OIDC provider via Client Credentials |
-| body   | -               | raw JSON | The raw Conforma CLI JSON output                                                       |
-
-#### Response
-
-- 204 - the result was accepted and persisted
-- 400 - if the request could not be understood or the JSON is malformed
-- 401 - if the caller was not authenticated (missing or invalid Bearer token)
-- 403 - if the caller was not authorized (token lacks required scope/role)
-- 404 - if the policy or validation ID was not found, or the validation does not belong to this policy
-- 409 - if the validation already has a result (duplicate callback)
-
-## Conforma Wrapper API Endpoints
-
-### POST `/api/v1/validate`
-
-Accept an SBOM document and policy reference, spawn a Conforma CLI validation, and asynchronously post the result back to the Trustify callback endpoint.
-
-Because the Conforma Wrapper is a network-accessible service, it **must authenticate incoming requests** using the same OIDC provider that Trustify uses. Callers must present a valid Bearer token obtained from the shared OIDC provider. The Wrapper validates the token by fetching the provider's JWKS and verifying the signature, expiry, and issuer — exactly the same mechanism Trustify uses for its own endpoints (see `trustify-auth` / `Authenticator`). This ensures that only authorized Trustify instances (or other permitted clients) can trigger validations.
-
-The Conforma Wrapper must also be pre-configured with OIDC client credentials so it can authenticate to Trustify when posting results back (see [Conforma Wrapper OIDC Configuration](#conforma-wrapper-oidc-configuration)).
+Submit an SBOM document and policy reference for validation.
 
 #### Request
 
-| part      | name            | type     | description                                                                            |
-| --------- | --------------- | -------- | -------------------------------------------------------------------------------------- |
-| header    | `Authorization` | `String` | `Bearer <access_token>` — token obtained from the shared OIDC provider                 |
-| multipart | `sbom`          | file     | The SBOM document to validate (JSON or XML)                                            |
-| multipart | `policy_ref`    | `String` | Policy source URL (e.g. `git://github.com/org/policy-repo?ref=main`)                   |
-| multipart | `callback_url`  | `String` | Trustify callback URL (`/api/v2/policy/{policy_id}/validation/{validation_id}/result`) |
-| multipart | `extra_args`    | `String` | Additional CLI flags forwarded to Conforma (optional, JSON-encoded array)              |
+| part      | name            | type     | description                                                          |
+| --------- | --------------- | -------- | -------------------------------------------------------------------- |
+| header    | `Authorization` | `String` | `Bearer <access_token>` — token for Conforma API authentication      |
+| multipart | `sbom`          | file     | The SBOM document to validate (JSON or XML)                          |
+| multipart | `policy_ref`    | `String` | Policy source URL (e.g. `git://github.com/org/policy-repo?ref=main`) |
+| multipart | `policy_paths`  | `String` | JSON-encoded array of sub-paths within the repo (optional)           |
+| multipart | `exclude`       | `String` | JSON-encoded array of rule codes to skip (optional)                  |
+| multipart | `include`       | `String` | JSON-encoded array of rule codes to evaluate exclusively (optional)  |
 
 #### Response
 
 - 202 - the validation was accepted and will be processed asynchronously
 
-  ```rust
-  #[derive(Serialize, Deserialize)]
-  struct WrapperValidationAccepted {
-      validation_id: Uuid,
+  ```json
+  {
+    "job_id": "<uuid>"
   }
   ```
 
 - 400 - if the request could not be understood or required fields are missing
-- 401 - if the caller was not authenticated (missing or invalid Bearer token)
-- 403 - if the caller was authenticated but not authorized (token lacks required scope/role)
-- 429 - if the concurrency semaphore is exhausted (too many concurrent validations)
+- 401 - if the caller was not authenticated
+- 503 - if the service cannot accept work at this time
+
+### GET `/validate/{job_id}`
+
+Check the status of a previously submitted validation job and retrieve results when complete.
+
+#### Request
+
+| part   | name            | type     | description                                                     |
+| ------ | --------------- | -------- | --------------------------------------------------------------- |
+| path   | `job_id`        | `String` | Job ID returned in the 202 response                             |
+| header | `Authorization` | `String` | `Bearer <access_token>` — token for Conforma API authentication |
+
+#### Response
+
+- 200 - job status and result (if completed)
+
+  ```json
+  {
+    "job_id": "<uuid>",
+    "status": "pending | running | completed | failed",
+    "result": { ... },
+    "error": "..."
+  }
+  ```
+
+  When `status` is `"completed"`, `result` contains the full Conforma validation output (same structure as the current Conforma CLI JSON output). When `status` is `"failed"`, `error` contains a description of the failure.
+
+- 401 - if the caller was not authenticated
+- 404 - if the job ID was not found
 
 ## File Structure
 
@@ -978,112 +997,86 @@ modules/policy/
 │   │   ├── mod.rs
 │   │   ├── ec_service.rs       # Main orchestration
 │   │   ├── policy_manager.rs   # Policy configuration
-│   │   └── result_parser.rs    # Output parsing
+│   │   ├── result_parser.rs    # Output parsing
+│   │   └── validation_poller.rs # Background polling task
 │   └── client/
-│        └── conforma.rs         # Conforma client adapter
-modules/conforma_wrapper
-├── build.rs
-├── Cargo.toml
-└── src/
-    ├── endpoints/
-    │   └── mod.rs          # REST endpoints
-    └── lib.rs
+│        └── conforma.rs         # Conforma API HTTP client
 ```
 
 ## Technical Considerations
 
-#### Conforma Wrapper OIDC Configuration
+#### Conforma API Client Configuration
 
-The Conforma Wrapper has two distinct OIDC responsibilities that share the **same OIDC provider** (e.g. the Keycloak realm used by Trustify):
-
-1. **Inbound authentication** — validate Bearer tokens on incoming requests to `/api/v1/validate`, ensuring only authorized callers (Trustify, CI systems, etc.) can trigger validations.
-2. **Outbound authentication** — obtain an access token via the Client Credentials Grant to authenticate when posting results back to the Trustify callback endpoint.
-
-Because both directions use the same OIDC provider, the Wrapper only needs a single issuer URL. It fetches the provider's discovery document (`.well-known/openid-configuration`) once at startup to obtain the JWKS URI (for inbound token validation) and the token endpoint (for outbound token acquisition).
-
-Conversely, the **Conforma client adapter** in Trustify (`modules/policy/src/client/conforma.rs`) also acts as a server: it exposes the callback endpoint (`POST /api/v2/policy/{policy_id}/validation/{validation_id}/result`) that receives validation results from the Conforma Wrapper. This endpoint must be protected so that only the Wrapper — authenticated via its Client Credentials token — can post results. Because the callback endpoint is a standard Trustify REST endpoint, it is protected by Trustify's existing OIDC authentication middleware (`trustify-auth` / `Authenticator`), which validates the Bearer token the Wrapper obtained during its outbound token acquisition. The OIDC client registered for the Wrapper must be granted the minimum role or scope required to call this callback (e.g. `policy:write`), and Trustify must reject tokens that lack the necessary permission with 403 Forbidden.
+Trustify's Conforma client requires the following configuration to communicate with the Conforma API:
 
 ##### Environment Variables
 
-The following environment variables (or equivalent configuration) must be set at deployment time:
+| Variable                           | Required | Description                                                                                                   |
+| ---------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------- |
+| `CONFORMA_API_URL`                 | yes      | Base URL of the Conforma API (e.g. `https://conforma.example.com`)                                            |
+| `CONFORMA_API_AUTH_TYPE`           | no       | Authentication type: `"oidc"` (default) or `"api_key"`                                                        |
+| `CONFORMA_OIDC_ISSUER_URL`         | cond.    | OIDC issuer URL, required when `auth_type` is `"oidc"`                                                        |
+| `CONFORMA_OIDC_CLIENT_ID`          | cond.    | OIDC client ID for obtaining tokens, required when `auth_type` is `"oidc"`                                    |
+| `CONFORMA_OIDC_CLIENT_SECRET`      | cond.    | OIDC client secret, required when `auth_type` is `"oidc"`                                                     |
+| `CONFORMA_API_KEY`                 | cond.    | API key, required when `auth_type` is `"api_key"`                                                             |
+| `CONFORMA_TLS_INSECURE`            | no       | Disable TLS certificate validation (default `false`; only for development)                                    |
+| `CONFORMA_TLS_CA_CERTIFICATES`     | no       | Additional CA certificates to trust when communicating with the Conforma API                                  |
+| `CONFORMA_POLL_INTERVAL_SECONDS`   | no       | Polling interval for the validation poller (default: 15 seconds)                                              |
+| `CONFORMA_DEFAULT_TIMEOUT_SECONDS` | no       | Default validation timeout (default: 300 seconds), overridable per-policy via `configuration.timeout_seconds` |
 
-| Variable                            | Required | Description                                                                                                                               |
-| ----------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `TRUSTIFY_OIDC_ISSUER_URL`          | yes      | OIDC issuer URL (e.g. `https://keycloak.example.com/realms/trustify`). Used for discovery of JWKS, token endpoint, and issuer validation. |
-| `TRUSTIFY_OIDC_CLIENT_ID`           | yes      | Client ID registered in the OIDC provider for the Conforma Wrapper (used for both inbound audience validation and outbound token grant)   |
-| `TRUSTIFY_OIDC_CLIENT_SECRET`       | yes      | Client secret for the registered client (used for the outbound Client Credentials Grant)                                                  |
-| `TRUSTIFY_OIDC_SCOPE`               | no       | OAuth scope to request on outbound token grants (defaults to provider default; set if Trustify requires a specific scope)                 |
-| `TRUSTIFY_OIDC_TLS_INSECURE`        | no       | Disable TLS certificate validation for the OIDC provider (default `false`; only for development)                                          |
-| `TRUSTIFY_OIDC_TLS_CA_CERTIFICATES` | no       | Additional CA certificates to trust when communicating with the OIDC provider                                                             |
+##### Authentication
 
-##### Inbound Token Validation
+When `auth_type` is `"oidc"`, the Conforma client uses the OAuth 2.0 Client Credentials Grant to obtain an access token from the OIDC provider. The token is cached and refreshed proactively before expiry (with a 30-second safety margin).
 
-On startup the Wrapper fetches the JWKS from the OIDC provider's discovery endpoint and caches it. For each incoming request to `/api/v1/validate`:
+When `auth_type` is `"api_key"`, the client sends the key in the `Authorization` header as `Bearer <api_key>`.
 
-1. Extract the `Authorization: Bearer <token>` header.
-2. Verify the JWT signature against the cached JWKS (refresh on cache miss for key rotation).
-3. Validate standard claims: `iss` matches `TRUSTIFY_OIDC_ISSUER_URL`, token is not expired, `aud` or `azp` includes the expected client.
-4. On failure return 401 Unauthorized.
-
-This follows the same validation logic that Trustify's own `Authenticator` uses (see `trustify-auth` crate), so the Wrapper can reuse or mirror that implementation.
-
-##### Outbound Token Acquisition
-
-For posting results back to Trustify the Wrapper uses the **OAuth 2.0 Client Credentials Grant**:
-
-**Token lifecycle**: The Wrapper should cache the access token and refresh it proactively before expiry (using the `expires_in` value from the token response). This avoids a token request on every callback and handles clock skew by refreshing with a safety margin (e.g. 30 seconds before expiry).
-
-**Failure handling**: If the token request fails (OIDC provider unreachable, invalid credentials), the Wrapper cannot deliver the callback. The validation remains in `in_progress` state until Trustify's timeout mechanism marks it as `failed` (see below). The Wrapper should log the token acquisition error and may retry with exponential backoff before giving up.
-
-**Trustify timeout mechanism**: A background reaper task runs periodically inside the Policy Verifier service (default interval: 60 seconds). On each tick it queries for `policy_validation` rows whose `status` is `in_progress` and whose `updated_at` timestamp is older than the configured timeout (default: the policy's `timeout_seconds`, falling back to the global default of 5 minutes). Each stale row is transitioned to `status = 'failed'` with an `error` of `"Validation timed out"`. This covers every failure scenario where the Wrapper never delivers a callback — CLI hang, Wrapper crash, network partition, or token acquisition failure. The reaper uses an `UPDATE … WHERE status = 'in_progress' AND updated_at < NOW() - interval` query so it is idempotent and safe to run from multiple Trustify replicas concurrently.
+The authentication mechanism is defined behind a trait so additional schemes can be added without modifying the core client logic.
 
 ##### Security Considerations
 
-- The client secret must be stored securely (e.g. Kubernetes Secret, vault injection) and never logged.
-- The OIDC client registered for the Conforma Wrapper should be a **dedicated confidential client** (e.g. `conforma-wrapper`) in the OIDC provider, separate from clients used by human users or other services. This client should be granted a narrow, purpose-specific scope — `trustify:policy-callback` — that maps to the single permission needed to post validation results to the callback endpoint. Trustify's authorization middleware must enforce this scope on the callback route (`POST /api/v2/policy/{policy_id}/validation/{validation_id}/result`), rejecting tokens that lack it with 403 Forbidden. By using a dedicated client and scope rather than a broad role like `policy:write`, the blast radius of a compromised credential is limited to callback delivery only — the Wrapper cannot read, delete, or otherwise mutate policies or other Trustify resources.
-- TLS is required for all OIDC communication (provider discovery, JWKS fetch, token endpoint).
-- The Wrapper should reject tokens from unexpected issuers; the `TRUSTIFY_OIDC_ISSUER_URL` acts as an allowlist of exactly one trusted issuer.
-
-#### Conforma CLI Execution
-
-The Conforma Wrapper invokes Conforma CLI via process spawning (e.g., `tokio::process::Command`). All arguments are passed as an array — never as a shell string — to prevent CLI injection. Execution has a configurable timeout (default 5 minutes); SBOMs are written to a temp file and passed by path in order to avoid OOM issues as SBOM can be very large file they shouldn't not be transfered via STDIN stream.
-
-Exit codes are treated as follows: 0 = pass, 1 = policy violations (expected failure, not an error), 2+ = execution error. It is important to distinguish 1 from 2+ in error handling — a policy violation is a valid result that should be surfaced to the user, not treated as a system failure.
+- Client secrets and API keys must be stored securely (e.g. Kubernetes Secret, vault injection) and never logged.
+- TLS is required for all communication with the Conforma API in production.
+- The OIDC client registered for Trustify's Conforma integration should use a narrow scope that grants only the ability to submit and query validations.
 
 #### Concurrency and Backpressure
 
 Concurrency is controlled at two levels:
 
-- **Trustify (duplicate prevention)** — Before forwarding a request to the Conforma Wrapper, the Policy Verifier service checks whether a validation is already queued or in progress for the same SBOM + policy pair. If one exists, the request is rejected with 409 Conflict, preventing duplicate work.
-- **Conforma Wrapper (resource protection)** — Concurrent Conforma CLI processes are bounded by a semaphore (default: 5). When the semaphore is exhausted, the Wrapper returns 429 Too Many Requests, which Trustify propagates to the caller. This makes the capacity limit explicit so that callers (e.g., CI pipelines) can implement their own retry with backoff.
+- **Trustify (duplicate prevention)** — Before forwarding a request to the Conforma API, the Policy Verifier service checks whether a validation is already queued or in progress for the same SBOM + policy pair. If one exists, the request is rejected with 409 Conflict, preventing duplicate work.
+- **Conforma API (resource protection)** — The Conforma API manages its own internal concurrency limits. When it cannot accept additional work, it returns an appropriate error (e.g. 503 Service Unavailable), which Trustify propagates to the caller. This delegates capacity management to the service that owns the resources, avoiding the need for Trustify to maintain a semaphore or concurrency limit for an external service.
 
-If demand grows beyond what the semaphore-based approach can handle, a proper queue (Redis/RabbitMQ) is a deferred alternative (see _Batch Processing Queue_ in Alternatives Considered above).
+#### Validation Poller
 
-##### Kubernetes Deployment
+The validation poller is a background task within the Policy Verifier service that periodically checks the Conforma API for completed validations:
 
-When both Trustify and the Conforma Wrapper are deployed on a Kubernetes cluster, native K8s primitives can complement the application-level concurrency controls described above:
-
-- **Readiness and liveness probes** — The Conforma Wrapper exposes two health endpoints that Kubernetes uses to manage pod lifecycle and traffic routing:
-  - _Liveness_ (`GET /healthz`) — returns 200 if the process is alive. Kubernetes restarts the pod if this probe fails (e.g. deadlock, unrecoverable panic). The check is lightweight: it confirms the HTTP server loop is responsive and, optionally, that the OIDC JWKS cache is populated.
-  - _Readiness_ (`GET /readyz`) — returns 200 when the pod can accept new work, and 503 when it cannot. The readiness check is tied to the concurrency semaphore: when all permits are in use, the endpoint returns 503, signalling Kubernetes to remove the pod from the Service's endpoint list. New requests are then routed only to pods that still have capacity. Once a permit is released, the probe returns 200 and the pod re-enters the rotation. This provides cluster-level backpressure that is transparent to Trustify — the K8s Service load-balances across ready pods automatically, reducing the likelihood of 429 responses reaching the caller. A 429 is still returned as a last resort if a request arrives between a readiness check and semaphore exhaustion.
-- **Horizontal Pod Autoscaler (HPA)** — The Wrapper Deployment can be configured with an HPA that scales replicas based on CPU/memory utilization or a custom metric such as the in-flight validation count exposed via a `/metrics` endpoint. Because the readiness probe already removes saturated pods from the Service, the HPA's scaling decisions and the readiness-driven traffic shifting work together: the HPA adds capacity while readiness prevents overload on existing pods. This allows the cluster to absorb demand spikes without requiring a centralized queue.
-- **Resource limits and requests** — Each Wrapper pod should declare CPU and memory `requests` and `limits` that account for the peak resource usage of the CLI subprocess (the semaphore concurrency multiplied by the per-process footprint). This prevents a burst of validations from starving other workloads on the node.
-- **NetworkPolicy** — A Kubernetes `NetworkPolicy` can restrict ingress to the Wrapper pods so that only Trustify pods (selected by label) are allowed to reach the `/api/v1/validate` endpoint. This provides a network-layer defense-in-depth on top of the OIDC-based authentication, ensuring that even if a valid token were leaked, it could not be used from outside the trusted namespace.
-- **Service discovery** — Trustify references the Wrapper via its Kubernetes `Service` DNS name (e.g. `conforma-wrapper.trustify.svc.cluster.local`). This decouples Trustify from individual pod IPs and lets K8s load-balance requests across ready Wrapper replicas automatically. Combined with the readiness probe, Trustify never needs to be aware of individual pod capacity — the Service only routes to pods that have reported ready.
-- **Secrets management** — The OIDC client secret and any policy-repo credentials should be mounted from Kubernetes `Secret` resources (or injected via an external secrets operator such as External Secrets or HashiCorp Vault Agent) rather than embedded in environment variable literals. This integrates with K8s RBAC to limit which pods and service accounts can access the sensitive material.
+- **Interval**: Configurable via `CONFORMA_POLL_INTERVAL_SECONDS` (default: 15 seconds).
+- **Batch processing**: On each tick, it fetches all `in_progress` validation rows and checks their status with the Conforma API. Requests are made concurrently (bounded by an internal semaphore to avoid overwhelming the Conforma API).
+- **Timeout detection**: If a validation has been `in_progress` longer than its configured timeout, the poller transitions it to `failed` without querying the Conforma API.
+- **Idempotency**: The poller uses conditional updates (`UPDATE ... WHERE status = 'in_progress' AND id = ?`) so it is safe to run from multiple Trustify replicas concurrently.
+- **Error handling**: If the Conforma API is temporarily unreachable during a poll cycle, the poller logs the error and retries on the next tick. Transient API errors do not cause validation failures — only persistent unreachability beyond the timeout window does.
 
 #### Policy Management
 
-When the policy.policy_type is "Conforma", the initial only policy type supported, the `policy` is using external references only and therefore Trustify does not cache policy content.
-
-Conforma fetches the policy at validation time from the git source specified in `policy.configuration.policy_ref`.
+When the `policy.policy_type` is `"Conforma"`, Trustify stores only external references and does not cache policy content. Conforma fetches the policy at validation time from the git source specified in `policy.configuration.policy_ref`.
 
 The trade-off: validation always uses the latest policy content from the referenced branch or tag, but network failures or policy repo outages will cause execution errors. For private policy repositories, authentication credentials are stored in the `configuration` JSONB column and encrypted at rest using `ring::aead` (AES-256-GCM authenticated encryption); they are never logged. The `ring` crate is already a direct dependency of the project (used for digest hashing), so no new dependency is required.
 
-The `policy_validation.policy_version` field records the policy commit hash or tag resolved from the `policy_ref` git source at validation time, enabling reproducibility and audit.
-`policy_validation.summary.conforma_version`, which tracks the Conforma CLI tool version number (e.g., `v0.8.83`).
+The `policy_validation.type_metadata.conforma_version` field records the Conforma version used for the validation, enabling reproducibility and audit.
+
+#### Kubernetes Deployment
+
+When both Trustify and Conforma are deployed on a Kubernetes cluster, native K8s primitives complement the application-level controls:
+
+- **Service discovery** — Trustify references the Conforma API via its Kubernetes `Service` DNS name (e.g. `conforma-api.trustify.svc.cluster.local`). This decouples Trustify from individual pod IPs and lets K8s load-balance requests across replicas.
+- **Resource limits and requests** — Each Conforma API pod should declare CPU and memory `requests` and `limits` appropriate for its validation workload.
+- **NetworkPolicy** — A Kubernetes `NetworkPolicy` can restrict ingress to the Conforma API pods so that only Trustify pods (selected by label) are allowed to reach the API. This provides network-layer defense-in-depth on top of token-based authentication.
+- **Secrets management** — OIDC client secrets, API keys, and policy-repo credentials should be mounted from Kubernetes `Secret` resources (or injected via an external secrets operator) rather than embedded in environment variable literals.
 
 ## Future Work
+
+#### Conforma API Availability
+
+This ADR's implementation is contingent on the Conforma REST API becoming available. The expected API contract documented above will be refined in collaboration with the Conforma team. Trustify's client adapter is designed behind a trait interface to absorb API contract changes with minimal impact on the rest of the codebase.
 
 #### Validation on SBOM upload
 
