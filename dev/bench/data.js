@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778852609048,
+  "lastUpdate": 1780321627225,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -15339,6 +15339,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "86094767+mrrajan@users.noreply.github.com",
+            "name": "mrrajan",
+            "username": "mrrajan"
+          },
+          "committer": {
+            "email": "86094767+mrrajan@users.noreply.github.com",
+            "name": "Rajan Ravi",
+            "username": "mrrajan"
+          },
+          "distinct": true,
+          "id": "481c81e8d0ba68db1ab66b8280a67983c14d537d",
+          "message": "docs: Address review feedback and add Creator pattern convention\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-05-28T09:34:56Z",
+          "tree_id": "9c1f2b436b367da2a3eaf52cbd3d5532bd2fa1be",
+          "url": "https://github.com/gildub/trustify/commit/481c81e8d0ba68db1ab66b8280a67983c14d537d"
+        },
+        "date": 1780321625203,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 10,
             "unit": "s"
           }
         ]
