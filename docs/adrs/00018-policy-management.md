@@ -122,8 +122,7 @@ enum AuthType {
 struct PolicyAuth {
     #[serde(rename = "type")]
     auth_type: AuthType,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    token_encrypted: Option<String>,
+    token_encrypted: String,
 }
 ```
 
