@@ -72,7 +72,7 @@ This JSONB schema describes the configuration for `policy_type = Conforma`. Futu
 #### Data Model Implementation
 
 ```rust
-enum ValidatorKind {
+enum PolicyType {
     Null,
     Conforma,
 }
@@ -88,7 +88,7 @@ struct Policy {
     name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     description: Option<String>,
-    policy_type: ValidatorKind,
+    policy_type: PolicyType,
     configuration: PolicyConfiguration,
     /// Conditional updates compare this revision (also exposed as `ETag` on GET).
     /// Stored as UUID in database, serialized as String in API responses.
@@ -103,7 +103,7 @@ struct PolicyRequest {
     name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     description: Option<String>,
-    policy_type: ValidatorKind,
+    policy_type: PolicyType,
     configuration: PolicyConfiguration,
 }
 ```
