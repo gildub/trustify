@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780321627225,
+  "lastUpdate": 1780403887985,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -15363,6 +15363,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/481c81e8d0ba68db1ab66b8280a67983c14d537d"
         },
         "date": 1780321625203,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 10,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "ef0d70e7c0e1e0c81cd595949436a2c740d7a05e",
+          "message": "fix: let AnalysisService use the ReadOnly connection\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-06-02T09:49:07Z",
+          "tree_id": "affe6fa64af34554ac0178cb3c1cbac764d1f4ea",
+          "url": "https://github.com/gildub/trustify/commit/ef0d70e7c0e1e0c81cd595949436a2c740d7a05e"
+        },
+        "date": 1780403885760,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
