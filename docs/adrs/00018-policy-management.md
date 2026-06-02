@@ -73,7 +73,6 @@ This JSONB schema describes the configuration for `policy_type = Conforma`. Futu
 
 ```rust
 enum PolicyType {
-    Null,
     Conforma,
 }
 ```
