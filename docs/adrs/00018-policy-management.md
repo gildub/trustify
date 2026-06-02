@@ -35,10 +35,12 @@ Trustify stores only the identity and location of a policy (id, name, URL/ref, c
 - `name` (VARCHAR, unique) — user-friendly label
 - `description` (TEXT) — what this policy enforces
 - `policy_type` (ENUM) — `'Conforma'`
-- `configuration` (JSONB) — see model below
+- `configuration` (JSONB) — Conforma-specific configuration model shown below
 - `revision` (UUID) — used for conditional UPDATE (optimistic concurrency via `ETag`); stored as UUID in database, exposed as opaque string in API responses
 
 **`policy.configuration` JSONB model:**
+
+This JSONB schema describes the configuration for `policy_type = Conforma`. Future validator backends may use a different configuration shape, so the field remains JSONB to allow backend-specific extensions.
 
 | Field                  | Type     | Required        | Description                                                                                                           |
 | ---------------------- | -------- | --------------- | --------------------------------------------------------------------------------------------------------------------- |
