@@ -181,11 +181,11 @@ This distinction ensures that clients using optimistic concurrency (`IfMatch`) r
 ## Trustify API Endpoints
 
 ```
-POST   /api/v2/policy          # Create a new policy reference
-GET    /api/v2/policy          # List policy references
-GET    /api/v2/policy/{id}     # Get a single policy reference
-PUT    /api/v2/policy/{id}     # Update a policy reference
-DELETE /api/v2/policy/{id}     # Delete a policy reference
+POST   /api/v3/policy          # Create a new policy reference
+GET    /api/v3/policy          # List policy references
+GET    /api/v3/policy/{id}     # Get a single policy reference
+PUT    /api/v3/policy/{id}     # Update a policy reference
+DELETE /api/v3/policy/{id}     # Delete a policy reference
 ```
 
 ### Permissions
@@ -212,13 +212,13 @@ Endpoint permission requirements:
 
 | Endpoint                     | Permission      |
 | ---------------------------- | --------------- |
-| `POST /api/v2/policy`        | `create.policy` |
-| `GET /api/v2/policy`         | `read.policy`   |
-| `GET /api/v2/policy/{id}`    | `read.policy`   |
-| `PUT /api/v2/policy/{id}`    | `update.policy` |
-| `DELETE /api/v2/policy/{id}` | `delete.policy` |
+| `POST /api/v3/policy`        | `create.policy` |
+| `GET /api/v3/policy`         | `read.policy`   |
+| `GET /api/v3/policy/{id}`    | `read.policy`   |
+| `PUT /api/v3/policy/{id}`    | `update.policy` |
+| `DELETE /api/v3/policy/{id}` | `delete.policy` |
 
-### POST `/api/v2/policy`
+### POST `/api/v3/policy`
 
 Create a new policy reference.
 
@@ -239,7 +239,7 @@ Create a new policy reference.
   And:
 
   ```
-  Location: /api/v2/policy/<id>
+  Location: /api/v3/policy/<id>
   ```
 
 - 400 - if the request could not be understood
@@ -247,7 +247,7 @@ Create a new policy reference.
 - 403 - if the user was authenticated but not authorized
 - 409 - if a policy with the same name already exists
 
-### GET `/api/v2/policy`
+### GET `/api/v3/policy`
 
 List policy references, optionally filtered.
 
@@ -281,7 +281,7 @@ The following `q` parameters are supported:
 - 401 - if the user was not authenticated
 - 403 - if the user was authenticated but not authorized
 
-### GET `/api/v2/policy/{id}`
+### GET `/api/v3/policy/{id}`
 
 Get a single policy reference by ID.
 
@@ -304,7 +304,7 @@ Get a single policy reference by ID.
 - 403 - if the user was authenticated but not authorized
 - 404 - if the policy was not found or the user doesn't have permission to read this policy
 
-### PUT `/api/v2/policy/{id}`
+### PUT `/api/v3/policy/{id}`
 
 Update an existing policy reference.
 
@@ -326,7 +326,7 @@ Update an existing policy reference.
 - 409 - if a policy with the same name already exists
 - 412 - if the `IfMatch` header was present, but its value didn't match the stored revision
 
-### DELETE `/api/v2/policy/{id}`
+### DELETE `/api/v3/policy/{id}`
 
 Delete an existing policy reference.
 
