@@ -40,16 +40,16 @@ Trustify stores only the identity and location of a policy (id, name, URL/ref, c
 
 **`policy.configuration` JSONB model:**
 
-| Field                  | Type     | Required        | Description                                                                                           |
-| ---------------------- | -------- | --------------- | ----------------------------------------------------------------------------------------------------- |
-| `policy_ref`           | string   | yes             | Policy source URL, e.g. `"git://[URL]?ref=[BRANCH OR TAG]"`                                           |
-| `auth`                 | object   | no              | Credentials for private repos; sensitive values encrypted via `ring::aead` AES-256-GCM (never logged) |
-| `auth.type`            | enum     | yes (if `auth`) | `AuthType` enum: `token`, `ssh_key`, or `none`                                                        |
-| `auth.token_encrypted` | string   | no              | AES-256-GCM encrypted bearer/PAT token, prefixed with encryption scheme                               |
-| `policy_paths`         | string[] | no              | Sub-paths within the repo to evaluate                                                                 |
-| `exclude`              | string[] | no              | Rule codes to skip during validation                                                                  |
-| `include`              | string[] | no              | If non-empty, only these rule codes are evaluated                                                     |
-| `timeout_seconds`      | integer  | no              | Per-policy override of the default execution timeout                                                  |
+| Field                  | Type     | Required        | Description                                                                                                           |
+| ---------------------- | -------- | --------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `policy_ref`           | string   | yes             | Policy source URL, e.g. `"git://[URL]?ref=[BRANCH OR TAG]"`                                                           |
+| `auth`                 | object   | no              | Credentials for private repos; encrypted by client before sending to Trustify (never logged or decrypted by Trustify) |
+| `auth.type`            | enum     | yes (if `auth`) | `AuthType` enum: `token`, `ssh_key`, or `none`                                                                        |
+| `auth.token_encrypted` | string   | no              | Encrypted bearer/PAT token (format defined by client); Trustify stores opaque, validation engine decrypts at use time |
+| `policy_paths`         | string[] | no              | Sub-paths within the repo to evaluate                                                                                 |
+| `exclude`              | string[] | no              | Rule codes to skip during validation                                                                                  |
+| `include`              | string[] | no              | If non-empty, only these rule codes are evaluated                                                                     |
+| `timeout_seconds`      | integer  | no              | Per-policy override of the default execution timeout                                                                  |
 
 `policy.configuration` example:
 
@@ -153,7 +153,7 @@ Trustify stores only external references and does not cache policy content. When
 The trade-off:
 
 - Validation always uses the latest policy content from the referenced branch or tag, but network failures or policy repo outages will cause execution errors.
-- For private policy repositories, authentication credentials are stored in the `configuration` JSONB column and encrypted at rest using `ring::aead` (AES-256-GCM authenticated encryption); they are never logged. The `ring` crate is already a direct dependency of the project (used for digest hashing), so no new dependency is required.
+- Authentication credentials (in `auth.token_encrypted`) are stored as opaque encrypted strings. The client encrypts credentials before sending to Trustify; Trustify never decrypts or accesses the encryption key. When the validation engine requests credentials from Trustify, it receives the encrypted blob and is responsible for decryption. This pass-through model keeps Trustify decoupled from the encryption/authentication scheme and eliminates the need for Trustify to manage encryption keys.
 
 ### Type Safety
 
