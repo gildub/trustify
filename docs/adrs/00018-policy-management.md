@@ -36,7 +36,7 @@ Trustify stores only the identity and location of a policy (id, name, URL/ref, c
 - `description` (TEXT) — what this policy enforces
 - `policy_type` (ENUM) — `'Conforma'`
 - `configuration` (JSONB) — see model below
-- `revision` (UUID) — used for conditional UPDATE (optimistic concurrency via `ETag`)
+- `revision` (UUID) — used for conditional UPDATE (optimistic concurrency via `ETag`); stored as UUID in database, exposed as opaque string in API responses
 
 **`policy.configuration` JSONB model:**
 
@@ -44,7 +44,7 @@ Trustify stores only the identity and location of a policy (id, name, URL/ref, c
 | ---------------------- | -------- | --------------- | ----------------------------------------------------------------------------------------------------- |
 | `policy_ref`           | string   | yes             | Policy source URL, e.g. `"git://[URL]?ref=[BRANCH OR TAG]"`                                           |
 | `auth`                 | object   | no              | Credentials for private repos; sensitive values encrypted via `ring::aead` AES-256-GCM (never logged) |
-| `auth.type`            | string   | yes (if `auth`) | `"token"`, `"ssh_key"`, or `"none"`                                                                   |
+| `auth.type`            | enum     | yes (if `auth`) | `AuthType` enum: `token`, `ssh_key`, or `none`                                                        |
 | `auth.token_encrypted` | string   | no              | AES-256-GCM encrypted bearer/PAT token, prefixed with encryption scheme                               |
 | `policy_paths`         | string[] | no              | Sub-paths within the repo to evaluate                                                                 |
 | `exclude`              | string[] | no              | Rule codes to skip during validation                                                                  |
@@ -80,14 +80,17 @@ enum ValidatorKind {
 /// The policy reference information
 #[derive(Serialize, Deserialize)]
 struct Policy {
-    id: String,
+    #[serde(with = "uuid::serde::urn")]
+    #[schema(value_type = String)]
+    id: Uuid,
     name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     description: Option<String>,
     policy_type: ValidatorKind,
-    configuration: serde_json::Value,
+    configuration: PolicyConfiguration,
     /// Conditional updates compare this revision (also exposed as `ETag` on GET).
-    revision: Uuid,
+    /// Stored as UUID in database, serialized as String in API responses.
+    revision: String,
 }
 ```
 
@@ -99,17 +102,25 @@ struct PolicyRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     description: Option<String>,
     policy_type: ValidatorKind,
-    configuration: serde_json::Value,
+    configuration: PolicyConfiguration,
 }
 ```
 
 ```rust
+/// Authentication method for private policy repos
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum AuthType {
+    Token,
+    SshKey,
+    None,
+}
+
 /// Credentials for private policy repos (`policy.configuration.auth`)
 #[derive(Serialize, Deserialize)]
 struct PolicyAuth {
-    /// `"token"`, `"ssh_key"`, or `"none"`
     #[serde(rename = "type")]
-    auth_type: String,
+    auth_type: AuthType,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     token_encrypted: Option<String>,
 }
@@ -142,7 +153,30 @@ Trustify stores only external references and does not cache policy content. When
 The trade-off:
 
 - Validation always uses the latest policy content from the referenced branch or tag, but network failures or policy repo outages will cause execution errors.
-- For private policy repositories, authentication credentials are stored in the `configuration` JSONB column and encrypted at rest using `ring::aead` (AES-256-GCM authenticated encryption); they are never logged The `ring` crate is already a direct dependency of the project (used for digest hashing), so no new dependency is required.
+- For private policy repositories, authentication credentials are stored in the `configuration` JSONB column and encrypted at rest using `ring::aead` (AES-256-GCM authenticated encryption); they are never logged. The `ring` crate is already a direct dependency of the project (used for digest hashing), so no new dependency is required.
+
+### Type Safety
+
+The `configuration` field uses a strongly-typed `PolicyConfiguration` struct rather than raw `serde_json::Value`. This provides:
+
+- Compile-time validation of required fields (`policy_ref`)
+- Type safety for nested structures (e.g., `AuthType` enum)
+- Clear API contract in generated OpenAPI schemas
+- Prevention of malformed configurations at ingestion time
+
+The database still stores this as JSONB, but the API layer enforces the typed schema. If future validator backends require backend-specific fields not present in `PolicyConfiguration`, the struct can be extended with an optional `extensions: Option<serde_json::Value>` field rather than weakening the entire type.
+
+### DELETE Semantics and Optimistic Concurrency
+
+The DELETE endpoint follows these semantics:
+
+- **Without `IfMatch`**: Idempotent delete — returns `204` whether the resource exists or not
+- **With `IfMatch`**: Conditional delete with optimistic concurrency control
+  - `204` if the resource exists and the ETag matches
+  - `404` if the resource doesn't exist (cannot validate the precondition)
+  - `412` if the resource exists but the ETag doesn't match
+
+This distinction ensures that clients using optimistic concurrency (`IfMatch`) receive explicit feedback when a resource has been deleted by another client, rather than silently succeeding. Clients not using `IfMatch` benefit from simple idempotent delete semantics.
 
 ## Trustify API Endpoints
 
@@ -196,7 +230,7 @@ Create a new policy reference.
 
 #### Response
 
-- 201 - the policy was created
+- 201 - if the policy was successfully created
 
   ```yaml
   id: <id> # ID of the created policy
@@ -221,11 +255,12 @@ By default, the entries will be sorted by name ascending.
 
 #### Request
 
-| part  | name     | type       | description                                             |
-| ----- | -------- | ---------- | ------------------------------------------------------- |
-| query | `q`      | "q" string | "q style" query string                                  |
-| query | `limit`  | u64        | Maximum number of items to return                       |
-| query | `offset` | u64        | Initial items to skip before actually returning results |
+| part  | name     | type       | description                                                    |
+| ----- | -------- | ---------- | -------------------------------------------------------------- |
+| query | `q`      | "q" string | "q style" query string                                         |
+| query | `limit`  | u64        | Maximum number of items to return                              |
+| query | `offset` | u64        | Initial items to skip before actually returning results        |
+| query | `total`  | bool       | Whether to compute and return the total count (default: false) |
 
 The following `q` parameters are supported:
 
@@ -237,9 +272,9 @@ The following `q` parameters are supported:
 
   ```rust
   #[derive(Serialize, Deserialize)]
-  struct PaginatedPolicy {
-      total: u64,
+  struct PaginatedResults<Policy> {
       items: Vec<Policy>,
+      total: Option<u64>,
   }
   ```
 
@@ -266,6 +301,7 @@ Get a single policy reference by ID.
   | headers | `ETag` | string   | Value which indicates the revision |
 
 - 401 - if the user was not authenticated
+- 403 - if the user was authenticated but not authorized
 - 404 - if the policy was not found or the user doesn't have permission to read this policy
 
 ### PUT `/api/v2/policy/{id}`
@@ -282,7 +318,7 @@ Update an existing policy reference.
 
 #### Response
 
-- 204 - the policy was updated
+- 204 - if the policy was successfully updated
 - 400 - if the request could not be understood
 - 401 - if the user was not authenticated
 - 403 - if the user was authenticated but not authorized
@@ -306,10 +342,11 @@ Deleting a policy will fail if there are validation results referencing it.
 #### Response
 
 - 204 - if the policy was successfully deleted
-- 204 - if the policy was already deleted
+- 204 - if the policy was already deleted **and no `IfMatch` header was provided** (idempotent delete)
 - 400 - if the request could not be understood
 - 401 - if the user was not authenticated
 - 403 - if the user was authenticated but not authorized
+- 404 - if the policy was not found **and an `IfMatch` header was provided** (cannot validate precondition on missing resource)
 - 409 - if the policy has associated validation results
 - 412 - if the `IfMatch` header was present, but its value didn't match the stored revision
 
