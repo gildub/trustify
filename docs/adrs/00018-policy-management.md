@@ -166,9 +166,19 @@ The `configuration` field uses a strongly-typed `PolicyConfiguration` struct rat
 
 The database still stores this as JSONB, but the API layer enforces the typed schema. If future validator backends require backend-specific fields not present in `PolicyConfiguration`, the struct can be extended with an optional `extensions: Option<serde_json::Value>` field rather than weakening the entire type.
 
-### DELETE Semantics and Optimistic Concurrency
+### UPDATE and DELETE Semantics and Optimistic Concurrency
 
-The DELETE endpoint follows these semantics:
+Both UPDATE (PUT) and DELETE endpoints support optimistic concurrency control via the `IfMatch` header and follow consistent semantics:
+
+**UPDATE (PUT) Semantics:**
+
+- **Without `IfMatch`**: Unconditional update — always succeeds if resource exists and returns `204`
+- **With `IfMatch`**: Conditional update with optimistic concurrency control
+  - `204` if the resource exists and the ETag matches
+  - `404` if the resource doesn't exist (cannot validate the precondition)
+  - `412` if the resource exists but the ETag doesn't match
+
+**DELETE Semantics:**
 
 - **Without `IfMatch`**: Idempotent delete — returns `204` whether the resource exists or not
 - **With `IfMatch`**: Conditional delete with optimistic concurrency control
@@ -176,7 +186,10 @@ The DELETE endpoint follows these semantics:
   - `404` if the resource doesn't exist (cannot validate the precondition)
   - `412` if the resource exists but the ETag doesn't match
 
-This distinction ensures that clients using optimistic concurrency (`IfMatch`) receive explicit feedback when a resource has been deleted by another client, rather than silently succeeding. Clients not using `IfMatch` benefit from simple idempotent delete semantics.
+This distinction ensures that:
+
+- Clients using optimistic concurrency (`IfMatch`) receive explicit feedback when a resource has been modified or deleted by another client, rather than silently overwriting or succeeding
+- Clients not using `IfMatch` benefit from simple unconditional update semantics (PUT) and idempotent delete semantics (DELETE)
 
 ## Trustify API Endpoints
 
