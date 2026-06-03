@@ -36,7 +36,7 @@ Trustify stores only the identity and location of a policy (id, name, URL/ref, c
 - `description` (TEXT) — what this policy enforces
 - `policy_type` (ENUM) — `'Conforma'`
 - `configuration` (JSONB) — Conforma-specific configuration model shown below
-- `revision` (UUID) — used for conditional UPDATE (optimistic concurrency via `ETag`); stored as UUID in database, exposed as opaque string in API responses
+- `revision` (UUID) — used for conditional UPDATE (optimistic concurrency via `ETag`); stored as UUID in database and exposed as an opaque `ETag` header in GET responses
 
 **`policy.configuration` JSONB model:**
 
@@ -85,12 +85,10 @@ struct Policy {
     #[schema(value_type = String)]
     id: Uuid,
     name: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
+    description: String,
     policy_type: PolicyType,
     configuration: PolicyImporter,
-    /// Conditional updates compare this revision (also exposed as `ETag` on GET).
-    /// Stored as UUID in database, serialized as String in API responses.
+    /// Conditional updates compare this revision. Stored as UUID in database and exposed as an opaque `ETag` header on GET.
     revision: String,
 }
 ```
@@ -100,8 +98,7 @@ struct Policy {
 #[derive(Serialize, Deserialize)]
 struct PolicyRequest {
     name: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
+    description: String,
     policy_type: PolicyType,
     configuration: PolicyImporter,
 }
