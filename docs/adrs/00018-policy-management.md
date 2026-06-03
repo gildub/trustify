@@ -88,7 +88,7 @@ struct Policy {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     description: Option<String>,
     policy_type: PolicyType,
-    configuration: PolicyConfiguration,
+    configuration: PolicyImporter,
     /// Conditional updates compare this revision (also exposed as `ETag` on GET).
     /// Stored as UUID in database, serialized as String in API responses.
     revision: String,
@@ -103,7 +103,7 @@ struct PolicyRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     description: Option<String>,
     policy_type: PolicyType,
-    configuration: PolicyConfiguration,
+    configuration: PolicyImporter,
 }
 ```
 
@@ -128,19 +128,52 @@ struct PolicyAuth {
 
 ```rust
 /// Policy configuration (stored as JSONB)
-#[derive(Serialize, Deserialize)]
-struct PolicyConfiguration {
-    policy_ref: String,
+#[derive(
+    Clone,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    ToSchema,
+    schemars::JsonSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub struct PolicyImporter {
+    #[serde(flatten)]
+    pub common: CommonImporter,
+
+    /// Reference to the policy source, e.g. git://github.com/org/policy-repo?ref=main
+    pub policy_ref: String,
+
+    /// Credentials for private policy repositories
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    auth: Option<PolicyAuth>,
+    pub auth: Option<PolicyAuth>,
+
+    /// Sub-paths within the policy repository to evaluate
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    policy_paths: Vec<String>,
+    pub policy_paths: Vec<String>,
+
+    /// Rule codes to skip during validation
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    exclude: Vec<String>,
+    pub exclude: Vec<String>,
+
+    /// If non-empty, only these rule codes are evaluated
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    include: Vec<String>,
+    pub include: Vec<String>,
+
+    /// Per-policy override of the default execution timeout
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    timeout_seconds: Option<u32>,
+    pub timeout_seconds: Option<u32>,
+}
+```
+
+```rust
+/// extending modules/importer/src/model/mod.rs
+pub enum ImporterConfiguration {
+    // existing code
+    Policy(PolicyImporter),
 }
 ```
 
@@ -157,18 +190,16 @@ The trade-off:
 
 ### Type Safety
 
-The `configuration` field uses a strongly-typed `PolicyConfiguration` struct rather than raw `serde_json::Value`. This provides:
+The `configuration` field uses a strongly-typed `PolicyConfiguration` struct rather than raw `serde_json::Value`. Importer:
 
 - Compile-time validation of required fields (`policy_ref`)
 - Type safety for nested structures (e.g., `AuthType` enum)
 - Clear API contract in generated OpenAPI schemas
 - Prevention of malformed configurations at ingestion time
 
-The database still stores this as JSONB, but the API layer enforces the typed schema. If future validator backends require backend-specific fields not present in `PolicyConfiguration`, the struct can be extended with an optional `extensions: Option<serde_json::Value>` field rather than weakening the entire type.
+The database still stores this as JSONB, but the API layer enforces the typed schema. If future validator backends require backend-specific fields not present in `PolicyConfiguration`, the struct can be extended with an optional `extensions: Option<serde_json::Value>` field rather than weakeniImporter type.
 
 ### UPDATE and DELETE Semantics and Optimistic Concurrency
-
-Both UPDATE (PUT) and DELETE endpoints support optimistic concurrency control via the `IfMatch` header and follow consistent semantics:
 
 **UPDATE (PUT) Semantics:**
 
