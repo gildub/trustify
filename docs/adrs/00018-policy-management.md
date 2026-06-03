@@ -199,19 +199,11 @@ The policy module introduces the following permissions, following the existing T
 | `update.policy` | Update policy references   |
 | `delete.policy` | Delete policy references   |
 
-Endpoint permission requirements:
-
-| Endpoint                     | Permission      |
-| ---------------------------- | --------------- |
-| `POST /api/v3/policy`        | `create.policy` |
-| `GET /api/v3/policy`         | `read.policy`   |
-| `GET /api/v3/policy/{id}`    | `read.policy`   |
-| `PUT /api/v3/policy/{id}`    | `update.policy` |
-| `DELETE /api/v3/policy/{id}` | `delete.policy` |
-
 ### POST `/api/v3/policy`
 
 Create a new policy reference.
+
+**Permission required:** `create.policy`
 
 #### Request
 
@@ -243,6 +235,8 @@ Create a new policy reference.
 List policy references, optionally filtered.
 
 By default, the entries will be sorted by name ascending.
+
+**Permission required:** `read.policy`
 
 #### Request
 
@@ -276,6 +270,8 @@ The following `q` parameters are supported:
 
 Get a single policy reference by ID.
 
+**Permission required:** `read.policy`
+
 #### Request
 
 | part | name | type     | description             |
@@ -298,6 +294,8 @@ Get a single policy reference by ID.
 ### PUT `/api/v3/policy/{id}`
 
 Update an existing policy reference.
+
+**Permission required:** `update.policy`
 
 #### Request
 
@@ -322,6 +320,8 @@ Update an existing policy reference.
 Delete an existing policy reference.
 
 Deleting a policy will fail if there are validation results referencing it.
+
+**Permission required:** `delete.policy`
 
 #### Request
 
