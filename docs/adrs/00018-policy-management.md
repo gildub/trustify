@@ -199,15 +199,6 @@ The policy module introduces the following permissions, following the existing T
 | `update.policy` | Update policy references   |
 | `delete.policy` | Delete policy references   |
 
-These permissions map to the default OIDC scope groups:
-
-| Scope             | Permissions granted |
-| ----------------- | ------------------- |
-| `create:document` | `create.policy`     |
-| `read:document`   | `read.policy`       |
-| `update:document` | `update.policy`     |
-| `delete:document` | `delete.policy`     |
-
 Endpoint permission requirements:
 
 | Endpoint                     | Permission      |
