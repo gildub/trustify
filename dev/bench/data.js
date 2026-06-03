@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780414102534,
+  "lastUpdate": 1780495190765,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -15426,6 +15426,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 10,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "0d7d3f0321068c1d96961ee91df080cda79857a3",
+          "message": "chore: fix main build after merge",
+          "timestamp": "2026-06-03T08:17:30Z",
+          "tree_id": "aba54a4512501a294f526fbf9f5ec649827db24a",
+          "url": "https://github.com/gildub/trustify/commit/0d7d3f0321068c1d96961ee91df080cda79857a3"
+        },
+        "date": 1780495188513,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
             "unit": "s"
           }
         ]
