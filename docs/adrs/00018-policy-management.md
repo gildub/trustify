@@ -325,7 +325,7 @@ Get a single policy reference by ID.
 
 - 401 - if the user was not authenticated
 - 403 - if the user was authenticated but not authorized
-- 404 - if the policy was not found or the user doesn't have permission to read this policy
+- 404 - if the policy id doesn't match a policy UUID record or the user doesn't have permission to read this policy
 
 ### PUT `/api/v3/policy/{id}`
 
@@ -347,7 +347,7 @@ Update an existing policy reference.
 - 400 - if the request could not be understood
 - 401 - if the user was not authenticated
 - 403 - if the user was authenticated but not authorized
-- 404 - if the policy was not found
+- 404 - if the policy id doesn't match a policy UUID record
 - 409 - if a policy with the same name already exists
 - 412 - if the `IfMatch` header was present, but its value didn't match the stored revision
 
@@ -373,7 +373,7 @@ Deleting a policy will fail if there are validation results referencing it.
 - 400 - if the request could not be understood
 - 401 - if the user was not authenticated
 - 403 - if the user was authenticated but not authorized
-- 404 - if the policy was not found **and an `IfMatch` header was provided** (cannot validate precondition on missing resource)
+- 404 - if the policy id doesn't match a policy UUID record **and an `IfMatch` header was provided** (cannot validate precondition on missing resource)
 - 409 - if the policy has associated validation results
 - 412 - if the `IfMatch` header was present, but its value didn't match the stored revision
 
