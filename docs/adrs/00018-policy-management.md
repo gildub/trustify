@@ -88,8 +88,6 @@ struct Policy {
     description: String,
     policy_type: PolicyType,
     configuration: PolicyImporter,
-    /// Conditional updates compare this revision. Stored as UUID in database and exposed as an opaque `ETag` header on GET.
-    revision: String,
 }
 ```
 
