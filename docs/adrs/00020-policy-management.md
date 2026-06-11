@@ -43,38 +43,32 @@ This JSONB schema describes the configuration for `policy_type = Conforma`. Futu
 
 | Field                  | Type     | Required        | Description                                                                                                           |
 | ---------------------- | -------- | --------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `policy_ref`           | string   | yes             | Policy source URL, e.g. `"git://[URL]?ref=[BRANCH OR TAG]"`                                                           |
+| `policyRef`            | string   | yes             | Policy source URL, e.g. `"git://[URL]?ref=[BRANCH OR TAG]"`                                                           |
 | `auth`                 | object   | no              | Credentials for private repos; encrypted by client before sending to Trustify (never logged or decrypted by Trustify) |
 | `auth.type`            | enum     | yes (if `auth`) | `AuthType` enum: `token`, `ssh_key`, or `none`                                                                        |
-| `auth.token_encrypted` | string   | no              | Encrypted bearer/PAT token (format defined by client); Trustify stores opaque, validation engine decrypts at use time |
-| `policy_paths`         | string[] | no              | Sub-paths within the repo to evaluate                                                                                 |
+| `auth.tokenEncrypted` | string   | no              | Encrypted bearer/PAT token (format defined by client); Trustify stores opaque, validation engine decrypts at use time |
+| `policyPaths`          | string[] | no              | Sub-paths within the repo to evaluate                                                                                 |
 | `exclude`              | string[] | no              | Rule codes to skip during validation                                                                                  |
 | `include`              | string[] | no              | If non-empty, only these rule codes are evaluated                                                                     |
-| `timeout_seconds`      | integer  | no              | Per-policy override of the default execution timeout                                                                  |
+| `timeoutSeconds`       | integer  | no              | Per-policy override of the default execution timeout                                                                  |
 
 `policy.configuration` example:
 
 ```json
 {
-  "policy_ref": "git://github.com/org/policy-repo?ref=main",
+  "policyRef": "git://github.com/org/policy-repo?ref=main",
   "auth": {
     "type": "token",
-    "token_encrypted": "AES-256-GCM:<base64-nonce>:<base64-ciphertext>"
+    "tokenEncrypted": "AES-256-GCM:<base64-nonce>:<base64-ciphertext>"
   },
-  "policy_paths": ["policy/lib", "policy/release"],
+  "policyPaths": ["policy/lib", "policy/release"],
   "exclude": ["hello_world.minimal_packages"],
   "include": [],
-  "timeout_seconds": 300
+  "timeoutSeconds": 300
 }
 ```
 
 #### Data Model Implementation
-
-```rust
-enum PolicyType {
-    Conforma,
-}
-```
 
 ```rust
 /// The policy reference information
@@ -83,19 +77,7 @@ struct Policy {
     id: String,
     name: String,
     description: String,
-    policy_type: PolicyType,
-    configuration: PolicyImporter,
-}
-```
-
-```rust
-/// Policy information that can be mutated
-#[derive(Serialize, Deserialize)]
-struct PolicyRequest {
-    name: String,
-    description: String,
-    policy_type: PolicyType,
-    configuration: PolicyImporter,
+    configuration: PolicyConfiguration,
 }
 ```
 
@@ -111,6 +93,7 @@ enum AuthType {
 
 /// Credentials for private policy repos (`policy.configuration.auth`)
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct PolicyAuth {
     r#type: AuthType,
     token_encrypted: String,
@@ -131,7 +114,7 @@ struct PolicyAuth {
     schemars::JsonSchema,
 )]
 #[serde(rename_all = "camelCase")]
-pub struct PolicyImporter {
+pub struct PolicyConfiguration {
     #[serde(flatten)]
     pub common: CommonImporter,
 
@@ -164,7 +147,7 @@ pub struct PolicyImporter {
 /// extending modules/importer/src/model/mod.rs
 pub enum ImporterConfiguration {
     // existing code
-    Policy(PolicyImporter),
+    Policy(PolicyConfiguration),
 }
 ```
 
@@ -172,23 +155,23 @@ pub enum ImporterConfiguration {
 
 ### Policy Management
 
-Trustify stores only external references and does not cache policy content. When `policy.policy_type` is `"Conforma"`, the validation engine fetches the policy at validation time from the git source specified in `policy.configuration.policy_ref`.
+Trustify stores only external references and does not cache policy content. When `policy.policy_type` is "Conforma", the validation engine fetches the policy at validation time from the git source specified in `policy.configuration.policyRef`.
 
 The trade-off:
 
 - Validation always uses the latest policy content from the referenced branch or tag, but network failures or policy repo outages will cause execution errors.
-- Authentication credentials (in `auth.token_encrypted`) are stored as opaque encrypted strings. The client encrypts credentials before sending to Trustify; Trustify never decrypts or accesses the encryption key. When the validation engine requests credentials from Trustify, it receives the encrypted blob and is responsible for decryption. This pass-through model keeps Trustify decoupled from the encryption/authentication scheme and eliminates the need for Trustify to manage encryption keys.
+- Authentication credentials (in `auth.tokenEncrypted`) are stored as opaque encrypted strings. The client encrypts credentials before sending to Trustify; Trustify never decrypts or accesses the encryption key. When the validation engine requests credentials from Trustify, it receives the encrypted blob and is responsible for decryption. This pass-through model keeps Trustify decoupled from the encryption/authentication scheme and eliminates the need for Trustify to manage encryption keys.
 
 ### Type Safety
 
 The `configuration` field uses a strongly-typed `PolicyConfiguration` struct rather than raw `serde_json::Value`. Importer:
 
-- Compile-time validation of required fields (`policy_ref`)
+- Compile-time validation of required fields (`policyRef`)
 - Type safety for nested structures (e.g., `AuthType` enum)
 - Clear API contract in generated OpenAPI schemas
 - Prevention of malformed configurations at ingestion time
 
-The database still stores this as JSONB, but the API layer enforces the typed schema. If future validator backends require backend-specific fields not present in `PolicyConfiguration`, the struct can be extended with an optional `extensions: Option<serde_json::Value>` field rather than weakeniImporter type.
+The database still stores this as JSONB, but the API layer enforces the typed schema. If future validator backends require backend-specific fields not present in `PolicyConfiguration`, the type can be extended with an optional `extensions: Option<serde_json::Value>` field rather than weakeniImporter type.
 
 ### UPDATE and DELETE Semantics and Optimistic Concurrency
 
@@ -242,9 +225,9 @@ Create a new policy reference.
 
 #### Request
 
-| part | name | type            | description |
-| ---- | ---- | --------------- | ----------- |
-| body | -    | `PolicyRequest` |             |
+| part | name | type     | description |
+| ---- | ---- | -------- | ----------- |
+| body | -    | `Policy` |             |
 
 #### Response
 
@@ -338,7 +321,7 @@ Update an existing policy reference.
 | ------ | --------- | ---------------- | ------------------------------ |
 | path   | `id`      | `String`         | ID of the policy to update     |
 | header | `IfMatch` | `Option<String>` | ETag value, revision to update |
-| body   | -         | `PolicyRequest`  | The new content                |
+| body   | -         | `Policy`         | The new content                |
 
 #### Response
 
