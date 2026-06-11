@@ -80,7 +80,7 @@ enum PolicyType {
 /// The policy reference information
 #[derive(Serialize, Deserialize)]
 struct Policy {
-    id: Uuid,
+    id: String,
     name: String,
     description: String,
     policy_type: PolicyType,
