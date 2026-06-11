@@ -112,8 +112,7 @@ enum AuthType {
 /// Credentials for private policy repos (`policy.configuration.auth`)
 #[derive(Serialize, Deserialize)]
 struct PolicyAuth {
-    #[serde(rename = "type")]
-    auth_type: AuthType,
+    r#type: AuthType,
     token_encrypted: String,
 }
 ```
