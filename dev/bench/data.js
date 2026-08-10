@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1782915868915,
+  "lastUpdate": 1786396120824,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -15595,6 +15595,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/19bbf41f2044efa93e2050b5e3573705d78cdc2c"
         },
         "date": 1782915865687,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "rh-jfuller",
+            "username": "rh-jfuller"
+          },
+          "committer": {
+            "email": "jfuller@redhat.com",
+            "name": "James Fuller",
+            "username": "rh-jfuller"
+          },
+          "distinct": true,
+          "id": "7e1a2a365a66358347cd61bca8881f04a059e270",
+          "message": "perf(enhance): refactored many of the v3 tests, added dataset for full atlas release, rationalised things",
+          "timestamp": "2026-08-02T16:38:50+02:00",
+          "tree_id": "f5d11bb45c2f28ea670a0944c3ec5fabc08f8bd0",
+          "url": "https://github.com/gildub/trustify/commit/7e1a2a365a66358347cd61bca8881f04a059e270"
+        },
+        "date": 1786396117396,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
