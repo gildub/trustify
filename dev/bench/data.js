@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1788514531076,
+  "lastUpdate": 1788530643645,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -15687,6 +15687,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gilles@redhat.com",
+            "name": "gildub",
+            "username": "gildub"
+          },
+          "committer": {
+            "email": "gilles@redhat.com",
+            "name": "gildub",
+            "username": "gildub"
+          },
+          "distinct": true,
+          "id": "c4bc621dd6df00e3c40df79de945ada844c5f5a3",
+          "message": "Merge remote-tracking branch 'upstream/main'",
+          "timestamp": "2026-09-04T15:47:35+02:00",
+          "tree_id": "fd5af290be6446009704ce71013e7e40ce473336",
+          "url": "https://github.com/gildub/trustify/commit/c4bc621dd6df00e3c40df79de945ada844c5f5a3"
+        },
+        "date": 1788530641222,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 8,
             "unit": "s"
           }
         ]
