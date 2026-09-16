@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789546834832,
+  "lastUpdate": 1789573006276,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -15769,6 +15769,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/87d7f5746941f4db00f7381822d1bc6ddc47be0b"
         },
         "date": 1789546833143,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rromerom@redhat.com",
+            "name": "Ruben Romero Montes",
+            "username": "ruromero"
+          },
+          "committer": {
+            "email": "rromerom@redhat.com",
+            "name": "Ruben Romero Montes",
+            "username": "ruromero"
+          },
+          "distinct": true,
+          "id": "c8f6bf95a40228e774a4f309e5f348a8c9eb574f",
+          "message": "chore(refactor): rebase conflict\n\nSigned-off-by: Ruben Romero Montes <rromerom@redhat.com>",
+          "timestamp": "2026-09-16T13:46:24Z",
+          "tree_id": "d1b228d9ee5a27eaa1b6c196db9b8a4d74954b2e",
+          "url": "https://github.com/gildub/trustify/commit/c8f6bf95a40228e774a4f309e5f348a8c9eb574f"
+        },
+        "date": 1789573004555,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
