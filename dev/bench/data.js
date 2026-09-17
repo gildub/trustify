@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789573006276,
+  "lastUpdate": 1789666147897,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -15798,6 +15798,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/c8f6bf95a40228e774a4f309e5f348a8c9eb574f"
         },
         "date": 1789573004555,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rromerom@redhat.com",
+            "name": "Ruben Romero Montes",
+            "username": "ruromero"
+          },
+          "committer": {
+            "email": "rromerom@redhat.com",
+            "name": "Ruben Romero Montes",
+            "username": "ruromero"
+          },
+          "distinct": true,
+          "id": "ba9c3ab5e0ec181021420f25c1ed7066347b872f",
+          "message": "fix(importer): accept uppercase SHA-256 digests in integrity verification\n\nUse eq_ignore_ascii_case instead of strict equality so discovery\nstrategies that supply uppercase or mixed-case hex digests are not\nincorrectly rejected. Error messages normalize expected to lowercase\nfor consistent output. Adds a test with an uppercase digest.\n\nImplements TC-6229\n\nAssisted-by: Claude Code\nCo-Authored-By: Claude Sonnet 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-09-17T15:22:55Z",
+          "tree_id": "b01d09c39156112b9c4188780595fad21b2d6ee7",
+          "url": "https://github.com/gildub/trustify/commit/ba9c3ab5e0ec181021420f25c1ed7066347b872f"
+        },
+        "date": 1789666145677,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
