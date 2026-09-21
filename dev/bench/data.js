@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789979989257,
+  "lastUpdate": 1789985216819,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -15914,6 +15914,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/8889d3dc5a7858f576a682b531bbee2744180ba0"
         },
         "date": 1789979986967,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rhodulak@redhat.com",
+            "name": "Roman Hodulák",
+            "username": "rhredhat"
+          },
+          "committer": {
+            "email": "jfuller@redhat.com",
+            "name": "James Fuller",
+            "username": "rh-jfuller"
+          },
+          "distinct": true,
+          "id": "b4cfa08c2b80f106aac12eeee83fcbcb610c2aa4",
+          "message": "Update modules/ingestor/src/graph/sbom/cyclonedx.rs\n\nCo-authored-by: sourcery-ai[bot] <58596630+sourcery-ai[bot]@users.noreply.github.com>",
+          "timestamp": "2026-09-21T09:09:02Z",
+          "tree_id": "765996878da44f9764ee482fa71eb2ccdde1582b",
+          "url": "https://github.com/gildub/trustify/commit/b4cfa08c2b80f106aac12eeee83fcbcb610c2aa4"
+        },
+        "date": 1789985214446,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
