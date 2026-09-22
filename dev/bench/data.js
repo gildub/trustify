@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790090666440,
+  "lastUpdate": 1790098031654,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16035,6 +16035,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gilles@redhat.com",
+            "name": "gildub",
+            "username": "gildub"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "388b656b10dbbc7dd6173535a6b58fad3a4c2c57",
+          "message": "fix(bulk-delete): handle UUID variants and look up digest-based IDs via fetch_sbom",
+          "timestamp": "2026-09-22T15:34:32Z",
+          "tree_id": "420d12005fae059912eccd9a33a16fe55a4b8ed3",
+          "url": "https://github.com/gildub/trustify/commit/388b656b10dbbc7dd6173535a6b58fad3a4c2c57"
+        },
+        "date": 1790098028970,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 6,
             "unit": "s"
           }
         ]
