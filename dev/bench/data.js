@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790001109100,
+  "lastUpdate": 1790090666440,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16006,6 +16006,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "rh-jfuller",
+            "username": "rh-jfuller"
+          },
+          "committer": {
+            "email": "jfuller@redhat.com",
+            "name": "James Fuller",
+            "username": "rh-jfuller"
+          },
+          "distinct": true,
+          "id": "c57ff3da29b597fc0a124e50b6caf1a31bae172d",
+          "message": "chore(ci): fix /perf-test missing local oidc so we can perf test this PR",
+          "timestamp": "2026-09-22T12:53:48Z",
+          "tree_id": "0342bf6960ef6f79cd46dbee8451b96824ba0984",
+          "url": "https://github.com/gildub/trustify/commit/c57ff3da29b597fc0a124e50b6caf1a31bae172d"
+        },
+        "date": 1790090664744,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 8,
             "unit": "s"
           }
         ]
