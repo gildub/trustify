@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790281997868,
+  "lastUpdate": 1790339877005,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16122,6 +16122,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "rh-jfuller",
+            "username": "rh-jfuller"
+          },
+          "committer": {
+            "email": "jfuller@redhat.com",
+            "name": "James Fuller",
+            "username": "rh-jfuller"
+          },
+          "distinct": true,
+          "id": "ec6ad5188f3c78ba229791339566fd86ef040d1e",
+          "message": "chore(clippy): fix clippy warning",
+          "timestamp": "2026-09-25T09:40:55Z",
+          "tree_id": "953190f0ee79ed5a4b1191b2910d3864d7f6477e",
+          "url": "https://github.com/gildub/trustify/commit/ec6ad5188f3c78ba229791339566fd86ef040d1e"
+        },
+        "date": 1790339874780,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
             "unit": "s"
           }
         ]
