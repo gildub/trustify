@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790339877005,
+  "lastUpdate": 1790352773990,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16146,6 +16146,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/ec6ad5188f3c78ba229791339566fd86ef040d1e"
         },
         "date": 1790339874780,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rromerom@redhat.com",
+            "name": "Ruben Romero Montes",
+            "username": "ruromero"
+          },
+          "committer": {
+            "email": "rromerom@redhat.com",
+            "name": "Ruben Romero Montes",
+            "username": "ruromero"
+          },
+          "distinct": true,
+          "id": "c3bc8c31571195e53301387ea475d646a1259075",
+          "message": "fix(recommend): supplement versioned_purl lookup with advisory fixed/not_affected versions\n\nIn advisory-only deployments (no vendor SBOMs or VEX ingestion), vendor-rebuilt\npackage versions like 1.70-rhlw-00001 only exist in purl_status (as exact-version\nfixed or not_affected entries) but never reach the versioned_purl table that\nrecommend_purls queries. As a result /recommend returns nothing for packages whose\nvendor rebuilds were never listed in an ingested SBOM or VEX document.\n\nExtend fetch_versioned_purls_by_base to also pull exact-version purl_status entries\n(status not_affected or fixed) for the same base PURLs and merge them as synthetic\nversioned_purl models. A deterministic v5 UUID keeps the pipeline uniform; if\nfetch_vulnerability_statuses finds no row for a synthetic ID it simply returns no\nvulnerability context, which is acceptable.\n\nCo-Authored-By: Claude Sonnet 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-09-25T12:45:04Z",
+          "tree_id": "c2df698d986b5ba7b4143ed82b812ee268973c79",
+          "url": "https://github.com/gildub/trustify/commit/c3bc8c31571195e53301387ea475d646a1259075"
+        },
+        "date": 1790352771252,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
