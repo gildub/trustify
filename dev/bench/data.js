@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790352773990,
+  "lastUpdate": 1790602859055,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16175,6 +16175,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/c3bc8c31571195e53301387ea475d646a1259075"
         },
         "date": 1790352771252,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "rh-jfuller",
+            "username": "rh-jfuller"
+          },
+          "committer": {
+            "email": "jfuller@redhat.com",
+            "name": "James Fuller",
+            "username": "rh-jfuller"
+          },
+          "distinct": true,
+          "id": "29a314770032cd3b837f184709c459fd5394a730",
+          "message": "ci: add experimental nightly builds from main",
+          "timestamp": "2026-09-26T10:32:29+02:00",
+          "tree_id": "49119fa5d31d95e4542f684fd2752f2c9bcc0e3c",
+          "url": "https://github.com/gildub/trustify/commit/29a314770032cd3b837f184709c459fd5394a730"
+        },
+        "date": 1790602856247,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
