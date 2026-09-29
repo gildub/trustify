@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790602859055,
+  "lastUpdate": 1790660460204,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16209,6 +16209,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jcrossle@jcrossle-thinkpadp1gen4i.rmtusga.csb",
+            "name": "Jim Crossley"
+          },
+          "committer": {
+            "email": "gilles@redhat.com",
+            "name": "Gilles Dubreuil",
+            "username": "gildub"
+          },
+          "distinct": true,
+          "id": "6ab37b58abe5ac7f5822f752686f8a7f422cc5bc",
+          "message": "feat(crypto): add algorithm inventory API with blast radius and summary\n\nAdd GET /v3/crypto/summary for KPI metrics (total algorithms, PQC-compliant\ncount, classical share percentage, SBOMs meeting PQC). Add GET\n/v3/sbom/{id}/crypto for per-SBOM crypto asset listing. Add asset_type\nfilter parameter to the existing list_algorithms endpoint. Extend\nCryptoAlgorithmSummary with sbom_id, primitive, packages_count, and\nsboms_count blast radius fields computed via Generates relationship joins.\n\nImplements TC-5850\n\nAssisted-by: Claude Code",
+          "timestamp": "2026-09-28T15:24:15Z",
+          "tree_id": "e73174812720b6e37ca4610892a73046b5301bde",
+          "url": "https://github.com/gildub/trustify/commit/6ab37b58abe5ac7f5822f752686f8a7f422cc5bc"
+        },
+        "date": 1790660456865,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 8,
             "unit": "s"
           }
         ]
