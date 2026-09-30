@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790762115929,
+  "lastUpdate": 1790762749445,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16261,6 +16261,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/f7022579308f659f7ab08fa476afdabb7961e9d4"
         },
         "date": 1790762114555,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "rh-jfuller",
+            "username": "rh-jfuller"
+          },
+          "committer": {
+            "email": "jfuller@redhat.com",
+            "name": "James Fuller",
+            "username": "rh-jfuller"
+          },
+          "distinct": true,
+          "id": "0b3bc0b343116be8df02ccceea4e7e61cf7a8ac3",
+          "message": "chore: prep 0.7.0-rc.1 for future work",
+          "timestamp": "2026-09-30T09:18:51Z",
+          "tree_id": "c9f9fe76133bcab33ee90a64b6e53cc9ebadb407",
+          "url": "https://github.com/gildub/trustify/commit/0b3bc0b343116be8df02ccceea4e7e61cf7a8ac3"
+        },
+        "date": 1790762747246,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
