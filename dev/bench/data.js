@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790859659720,
+  "lastUpdate": 1791193531360,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16348,6 +16348,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/e8ea4ed9a4d93c1bbb5a80cbf691a0427d8cf4d0"
         },
         "date": 1790859656246,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 7,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "rh-jfuller",
+            "username": "rh-jfuller"
+          },
+          "committer": {
+            "email": "jfuller@redhat.com",
+            "name": "James Fuller",
+            "username": "rh-jfuller"
+          },
+          "distinct": true,
+          "id": "e9b4d8c46bacca5a319e58f3350a439ccfac0533",
+          "message": "perf(sbom): load described_by dimensions separately\n\nPURLs, CPEs and licenses are independent one-to-many relations of a node.\nSelecting them in one statement multiplied rows and forced DISTINCT\naggregation over the inflated set. Load each dimension in its own indexed\nquery and join them in memory, dropping the unused versioned_purl,\nbase_purl and sbom joins along with the CPE composite-to-JSON round trip.",
+          "timestamp": "2026-10-05T07:36:31Z",
+          "tree_id": "725dfde7d96b26c867155eab8f22214b1c0488bb",
+          "url": "https://github.com/gildub/trustify/commit/e9b4d8c46bacca5a319e58f3350a439ccfac0533"
+        },
+        "date": 1791193529758,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
