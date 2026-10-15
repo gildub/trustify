@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792073978992,
+  "lastUpdate": 1792085578034,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16498,6 +16498,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 6,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rromerom@redhat.com",
+            "name": "Ruben Romero Montes",
+            "username": "ruromero"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "1bc76b8079af19aebcd574f4b31bf38339753ffa",
+          "message": "fix(purl): apply import and type-inference conventions to recommend_purls\n\nImport std::iter::once instead of using inline qualified path, remove\nredundant HashMap type annotation, and clarify CONVENTIONS.md wording\nthat caused the contradiction (lint threshold vs style rule).\n\nTC-6983\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-10-15T17:01:57+02:00",
+          "tree_id": "6ecb2c7aad389026fa51110a1381247aec522679",
+          "url": "https://github.com/gildub/trustify/commit/1bc76b8079af19aebcd574f4b31bf38339753ffa"
+        },
+        "date": 1792085575995,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 7,
             "unit": "s"
           }
         ]
