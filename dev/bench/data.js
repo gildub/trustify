@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792751185645,
+  "lastUpdate": 1792762805232,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16643,6 +16643,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 5,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "rh-jfuller",
+            "username": "rh-jfuller"
+          },
+          "committer": {
+            "email": "jfuller@redhat.com",
+            "name": "James Fuller",
+            "username": "rh-jfuller"
+          },
+          "distinct": true,
+          "id": "eb4c5dbfe2b0da1091fe241711d79c95d5dfee60",
+          "message": "ci: make supply-chain audits advisory for PRs\n\nReport cargo-deny failures as warnings for pull requests and merge queues.\nRequire a successful audit before building release artifacts, blocking\npublishing when the audit fails.\n\nCloses #2785",
+          "timestamp": "2026-10-23T11:55:23Z",
+          "tree_id": "e9ffedb9927284e364ca9cb1389012752593408e",
+          "url": "https://github.com/gildub/trustify/commit/eb4c5dbfe2b0da1091fe241711d79c95d5dfee60"
+        },
+        "date": 1792762803311,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 6,
             "unit": "s"
           }
         ]
