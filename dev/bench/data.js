@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792812057053,
+  "lastUpdate": 1792861998220,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16696,6 +16696,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/9e1444557ecc5de257637437794d940c1d9f7588"
         },
         "date": 1792812055455,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "rh-jfuller",
+            "username": "rh-jfuller"
+          },
+          "committer": {
+            "email": "jfuller@redhat.com",
+            "name": "James Fuller",
+            "username": "rh-jfuller"
+          },
+          "distinct": true,
+          "id": "a71a63077b227272251e18b4104df4a50bb8ed4a",
+          "message": "perf: add base PURL name index for sorted listings",
+          "timestamp": "2026-10-24T16:19:37Z",
+          "tree_id": "d4486144a7f731b74d43b04816fb8ec22d41e3dc",
+          "url": "https://github.com/gildub/trustify/commit/a71a63077b227272251e18b4104df4a50bb8ed4a"
+        },
+        "date": 1792861995875,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
