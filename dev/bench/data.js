@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792861998220,
+  "lastUpdate": 1793006996857,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16725,6 +16725,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/a71a63077b227272251e18b4104df4a50bb8ed4a"
         },
         "date": 1792861995875,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "rh-jfuller",
+            "username": "rh-jfuller"
+          },
+          "committer": {
+            "email": "jfuller@redhat.com",
+            "name": "James Fuller",
+            "username": "rh-jfuller"
+          },
+          "distinct": true,
+          "id": "6f50c704ee65ab047cc4fcecfebb730a092a9ec2",
+          "message": "sec: resolve cargo audit findings and document unfixable advisories",
+          "timestamp": "2026-10-26T08:15:43Z",
+          "tree_id": "c44689d41a75808768c14082a159f47f3815b951",
+          "url": "https://github.com/gildub/trustify/commit/6f50c704ee65ab047cc4fcecfebb730a092a9ec2"
+        },
+        "date": 1793006995269,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
