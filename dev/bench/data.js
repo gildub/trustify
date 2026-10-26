@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793035018006,
+  "lastUpdate": 1793035838858,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16812,6 +16812,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/d5b880871792a59f54ca0ac51e33087432de9484"
         },
         "date": 1793035015610,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "e537d55e58cfd3cbfe8eab34bb7eab4fbff817d3",
+          "message": "fix(ingestor): require upload permission before fetching documents",
+          "timestamp": "2026-10-26T16:22:45Z",
+          "tree_id": "9d68c82c18ae7b6b6e95e55857de559450e0f80a",
+          "url": "https://github.com/gildub/trustify/commit/e537d55e58cfd3cbfe8eab34bb7eab4fbff817d3"
+        },
+        "date": 1793035837138,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
