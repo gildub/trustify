@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793012051230,
+  "lastUpdate": 1793035018006,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16783,6 +16783,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/5d90b46978b334c1a132d29f6404b082bf6246d5"
         },
         "date": 1793012049368,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "d5b880871792a59f54ca0ac51e33087432de9484",
+          "message": "build(deps): bump brotli from 1.2.0 to 1.2.1 in /tools/perf\n\nBumps [brotli](https://github.com/google/brotli) from 1.2.0 to 1.2.1.\n- [Release notes](https://github.com/google/brotli/releases)\n- [Changelog](https://github.com/google/brotli/blob/go/brotli/v1.2.1/CHANGELOG.md)\n- [Commits](https://github.com/google/brotli/compare/v1.2.0...go/brotli/v1.2.1)\n\n---\nupdated-dependencies:\n- dependency-name: brotli\n  dependency-version: 1.2.1\n  dependency-type: indirect\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>",
+          "timestamp": "2026-10-26T14:23:09Z",
+          "tree_id": "9e01806e5194cb7d0f1a9191ae259a933a167261",
+          "url": "https://github.com/gildub/trustify/commit/d5b880871792a59f54ca0ac51e33087432de9484"
+        },
+        "date": 1793035015610,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
