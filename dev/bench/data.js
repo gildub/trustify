@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793035838858,
+  "lastUpdate": 1793043540301,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -16846,6 +16846,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "49699333+dependabot[bot]@users.noreply.github.com",
+            "name": "dependabot[bot]",
+            "username": "dependabot[bot]"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "6f08455d7d7a33ba238092cbb5b57c2fc315575b",
+          "message": "build(deps): bump setuptools from 83.0.0 to 84.1.0 in /tools/perf\n\nBumps [setuptools](https://github.com/pypa/setuptools) from 83.0.0 to 84.1.0.\n- [Release notes](https://github.com/pypa/setuptools/releases)\n- [Changelog](https://github.com/pypa/setuptools/blob/main/NEWS.rst)\n- [Commits](https://github.com/pypa/setuptools/compare/v83.0.0...v84.1.0)\n\n---\nupdated-dependencies:\n- dependency-name: setuptools\n  dependency-version: 84.1.0\n  dependency-type: indirect\n...\n\nSigned-off-by: dependabot[bot] <support@github.com>",
+          "timestamp": "2026-10-26T16:57:43Z",
+          "tree_id": "d755e623d93645e2f3b3382c3fc33dfe72038763",
+          "url": "https://github.com/gildub/trustify/commit/6f08455d7d7a33ba238092cbb5b57c2fc315575b"
+        },
+        "date": 1793043538359,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 7,
             "unit": "s"
           }
         ]
