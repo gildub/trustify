@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1793987149926,
+  "lastUpdate": 1794231470993,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -17223,6 +17223,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "rromerom@redhat.com",
+            "name": "Ruben Romero Montes",
+            "username": "ruromero"
+          },
+          "committer": {
+            "email": "rromerom@redhat.com",
+            "name": "Ruben Romero Montes",
+            "username": "ruromero"
+          },
+          "distinct": true,
+          "id": "261e56c8dc99b59b853b21b8708c4dd6b6a057f0",
+          "message": "docs(conventions): address review feedback without tooling duplication\n\nRestore pairwise iteration guidance and tracing imports, correct the test\nexemptions and swallowed-error advice, and align ADR-00019 with the\nsource-of-truth policy.\n\nDocumentation assertions and example checks pass. The full precommit gate\nfails during database bootstrap with an invalid TimeZone UTC value; the\nuser approved proceeding with this docs-only commit.\n\nImplements TC-7460\nImplements TC-7461\nImplements TC-7462\nImplements TC-7463\nImplements TC-7464\n\nAssisted-by: OpenCode (GPT-6.1 Sol)",
+          "timestamp": "2026-11-09T09:05:49Z",
+          "tree_id": "ed0ebb422d5037d5c3e7fc0aa2dc831fd26d9644",
+          "url": "https://github.com/gildub/trustify/commit/261e56c8dc99b59b853b21b8708c4dd6b6a057f0"
+        },
+        "date": 1794231469274,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 7,
             "unit": "s"
           }
         ]
