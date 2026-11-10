@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794309777605,
+  "lastUpdate": 1794349158513,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -17305,6 +17305,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/9ce6fdb3db8ae3643e84f0745c64063e2877b73a"
         },
         "date": 1794309775913,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "rh-jfuller",
+            "username": "rh-jfuller"
+          },
+          "committer": {
+            "email": "jfuller@redhat.com",
+            "name": "James Fuller",
+            "username": "rh-jfuller"
+          },
+          "distinct": true,
+          "id": "8385a7b4121b99f4fea71d59d3ec8a26ee3b6d22",
+          "message": "fix(sbom): scope severity counts to distinct package versions",
+          "timestamp": "2026-11-10T14:23:00Z",
+          "tree_id": "b20edf4e273da705924937d203549a9f4e3cd91f",
+          "url": "https://github.com/gildub/trustify/commit/8385a7b4121b99f4fea71d59d3ec8a26ee3b6d22"
+        },
+        "date": 1794349156269,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
