@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794304018578,
+  "lastUpdate": 1794309777605,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -17276,6 +17276,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/058a6e2580f88ada000823f8f93f5732dc7f4a25"
         },
         "date": 1794304016295,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "rh-jfuller",
+            "username": "rh-jfuller"
+          },
+          "committer": {
+            "email": "jfuller@redhat.com",
+            "name": "James Fuller",
+            "username": "rh-jfuller"
+          },
+          "distinct": true,
+          "id": "9ce6fdb3db8ae3643e84f0745c64063e2877b73a",
+          "message": "fix(purl): restore indexed recommendation status lookup",
+          "timestamp": "2026-11-10T09:36:52Z",
+          "tree_id": "b77f4f725f5f32b64d610f88f67ff4cc631810c7",
+          "url": "https://github.com/gildub/trustify/commit/9ce6fdb3db8ae3643e84f0745c64063e2877b73a"
+        },
+        "date": 1794309775913,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
