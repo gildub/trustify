@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794231470993,
+  "lastUpdate": 1794304018578,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -17252,6 +17252,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 7,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "noah@santschi-cooney.ch",
+            "name": "Noah Santschi-Cooney",
+            "username": "Strum355"
+          },
+          "committer": {
+            "email": "noah@santschi-cooney.ch",
+            "name": "Noah S-C",
+            "username": "Strum355"
+          },
+          "distinct": true,
+          "id": "058a6e2580f88ada000823f8f93f5732dc7f4a25",
+          "message": "test: fix PATCH tests for actix-web 4.18.2 method guard behavior\n\nactix-web 4.18.2 returns 405 instead of 404 when a resource exists\nbut the request method doesn't match any handler guard. The importer\nPATCH endpoint requires Content-Type: application/merge-patch+json;\nadd the header in tests so requests reach the handler.\n\nCo-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>",
+          "timestamp": "2026-11-09T14:02:15Z",
+          "tree_id": "5554f7f4df66b4b3e9882f73840e041f204b8d88",
+          "url": "https://github.com/gildub/trustify/commit/058a6e2580f88ada000823f8f93f5732dc7f4a25"
+        },
+        "date": 1794304016295,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
             "unit": "s"
           }
         ]
