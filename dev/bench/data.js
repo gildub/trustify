@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794349158513,
+  "lastUpdate": 1794492787335,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -17339,6 +17339,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "committer": {
+            "email": "desmax74@users.noreply.github.com",
+            "name": "Massimiliano Dessì - (Fast Chauffeur)",
+            "username": "desmax74"
+          },
+          "distinct": true,
+          "id": "23593b1ec881e2db4d58e75fb39a1e5da31ba59a",
+          "message": "build(deps): update csaf-rs to 0.7.1",
+          "timestamp": "2026-11-12T09:10:07Z",
+          "tree_id": "8d541fd78201ddd76885d30b91eb1a681d53bc8d",
+          "url": "https://github.com/gildub/trustify/commit/23593b1ec881e2db4d58e75fb39a1e5da31ba59a"
+        },
+        "date": 1794492785172,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 8,
             "unit": "s"
           }
         ]
