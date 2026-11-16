@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794492787335,
+  "lastUpdate": 1794826920410,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -17368,6 +17368,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "00hf11@gmail.com",
+            "name": "Helio Frota",
+            "username": "helio-frota"
+          },
+          "committer": {
+            "email": "00hf11@gmail.com",
+            "name": "Helio Frota",
+            "username": "helio-frota"
+          },
+          "distinct": true,
+          "id": "d5191de670a9516ff2d05f43eb874bdad70b0f6c",
+          "message": "chore: update grype version",
+          "timestamp": "2026-11-14T11:23:55Z",
+          "tree_id": "4a4c166d03033f55531b164460c5244de603e428",
+          "url": "https://github.com/gildub/trustify/commit/d5191de670a9516ff2d05f43eb874bdad70b0f6c"
+        },
+        "date": 1794826918319,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
             "unit": "s"
           }
         ]
