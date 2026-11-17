@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794826920410,
+  "lastUpdate": 1794919038776,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -17397,6 +17397,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 9,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "jfuller@redhat.com",
+            "name": "rh-jfuller",
+            "username": "rh-jfuller"
+          },
+          "committer": {
+            "email": "jfuller@redhat.com",
+            "name": "James Fuller",
+            "username": "rh-jfuller"
+          },
+          "distinct": true,
+          "id": "e0ae78f3eba4ff019cd830e147f5d10693cb5236",
+          "message": "fix(perf): reduce vulnerability-to-SBOM backlink query cost",
+          "timestamp": "2026-11-16T15:36:19Z",
+          "tree_id": "9d6dfe02afeddda4f161fe24eb537a96c2a7fb11",
+          "url": "https://github.com/gildub/trustify/commit/e0ae78f3eba4ff019cd830e147f5d10693cb5236"
+        },
+        "date": 1794919036275,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 8,
             "unit": "s"
           }
         ]
