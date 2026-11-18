@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1794919038776,
+  "lastUpdate": 1795012301677,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -17426,6 +17426,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "dbosanac@redhat.com",
+            "name": "Dejan Bosanac",
+            "username": "dejanb"
+          },
+          "committer": {
+            "email": "00hf11@gmail.com",
+            "name": "Helio Frota",
+            "username": "helio-frota"
+          },
+          "distinct": true,
+          "id": "21645aaa13b80d07be0ec1ea48457a50a3b62fec",
+          "message": "ci: remove dead deploy job from latest-release workflow\n\nThe deploy job has been skipped on every run since c9998284\n(2025-02-12). Its condition reads needs.init.outputs.version, but\ninit is not listed in the job's needs, and the needs context only\nexposes direct dependencies. The value is therefore always empty and\nthe condition never true, including on pushes to main.\n\nAs the job is unused, it is removed together with the env block and\nheader comment that only it referenced. The OPENSHIFT_TOKEN secret it\nrelied on is no longer needed and can be revoked. No change in\nbehavior for any job that currently runs.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-11-18T11:43:55Z",
+          "tree_id": "a728f267a8af175248ce5461acd3d8cd661376c4",
+          "url": "https://github.com/gildub/trustify/commit/21645aaa13b80d07be0ec1ea48457a50a3b62fec"
+        },
+        "date": 1795012296990,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 9,
             "unit": "s"
           }
         ]
