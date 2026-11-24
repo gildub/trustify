@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795454533401,
+  "lastUpdate": 1795545737260,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -17571,6 +17571,35 @@ window.BENCHMARK_DATA = {
           {
             "name": "Ingest DS3",
             "value": 8,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "5594dea1403580f8a36cb8ca7f889052927e8852",
+          "message": "fix(schema): regenerate importer duration definitions",
+          "timestamp": "2026-11-24T17:09:26Z",
+          "tree_id": "6540b8f7c8b8adff2470d2c8b534d4a57195aee3",
+          "url": "https://github.com/gildub/trustify/commit/5594dea1403580f8a36cb8ca7f889052927e8852"
+        },
+        "date": 1795545736161,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 6,
             "unit": "s"
           }
         ]
