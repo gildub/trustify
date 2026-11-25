@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795545737260,
+  "lastUpdate": 1795631569755,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -17595,6 +17595,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/5594dea1403580f8a36cb8ca7f889052927e8852"
         },
         "date": 1795545736161,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 6,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "fae8508323dbbbcf367dabbc7da5dacc88b5b943",
+          "message": "chore: omit OpenSSL CLI from trustd runtime images",
+          "timestamp": "2026-11-25T15:18:48Z",
+          "tree_id": "deabcddfc77d9858b8b33edd349d371bbcbb2c3d",
+          "url": "https://github.com/gildub/trustify/commit/fae8508323dbbbcf367dabbc7da5dacc88b5b943"
+        },
+        "date": 1795631568557,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
