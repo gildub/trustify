@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1795631569755,
+  "lastUpdate": 1795727033530,
   "repoUrl": "https://github.com/gildub/trustify",
   "entries": {
     "Benchmark": [
@@ -17624,6 +17624,35 @@ window.BENCHMARK_DATA = {
           "url": "https://github.com/gildub/trustify/commit/fae8508323dbbbcf367dabbc7da5dacc88b5b943"
         },
         "date": 1795631568557,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Ingest DS3",
+            "value": 6,
+            "unit": "s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "gilles@redhat.com",
+            "name": "gildub",
+            "username": "gildub"
+          },
+          "committer": {
+            "email": "ctron@dentrassi.de",
+            "name": "Jens Reimann",
+            "username": "ctron"
+          },
+          "distinct": true,
+          "id": "2f9b4a566763c93c0073d66f1ab34b44568bbd53",
+          "message": "fix(crypto): no need to migrate existing data",
+          "timestamp": "2026-11-26T16:42:08Z",
+          "tree_id": "b91da683ba2e1c32ff5b9bdbf5577774dc7d087c",
+          "url": "https://github.com/gildub/trustify/commit/2f9b4a566763c93c0073d66f1ab34b44568bbd53"
+        },
+        "date": 1795727031430,
         "tool": "customSmallerIsBetter",
         "benches": [
           {
